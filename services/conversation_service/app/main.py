@@ -35,5 +35,5 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         print(f"An error occurred: {e}")
         # Optionally, send an error message to the client
-        await websocket.close(code=1011, reason=f"An internal error occurred.")
+        await websocket.close(code=1011, reason="An internal error occurred.")
 
