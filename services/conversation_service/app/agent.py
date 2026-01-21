@@ -1,18 +1,20 @@
 from langchain_community.chat_models import ChatOllama
 from langchain.chains import ConversationChain
-from langchain.memory import ConversationBufferMemory
+from langchain.memory import ConversationSummaryBufferMemory 
 
 # Initialize the LLM
 llm = ChatOllama(model="llama3.2:3b", temperature=0.3)
 
 # Initialize conversation memory
-memory = ConversationBufferMemory()
+# This memory summarizes older parts of the conversation once the token limit is reached.
+# It needs the LLM to do the summarization.
+memory = ConversationSummaryBufferMemory(llm=llm, max_token_limit=1000)
 
 # Initialize the conversation chain
 conversation_chain = ConversationChain(
     llm=llm,
     memory=memory,
-    verbose=True  # Set to True to see the chain's internal state in the server logs
+    verbose=True  
 )
 
 def get_agent_response(user_input: str) -> str:
