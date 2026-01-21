@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 Proposed Architecture and Components.pdf
+context_for_gemini.txt
 
 # C extensions
 *.so

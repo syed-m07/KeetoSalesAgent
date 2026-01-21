@@ -1,0 +1,24 @@
+
+
+services:
+  # The "Brain" of our application
+  conversation_service:
+    build: ./services/conversation_service
+    ports:
+      - "8000:8000"
+    volumes:
+      # This mounts your local code into the container for live-reloading
+      - ./services/conversation_service/app:/app/app
+    # The command overrides the Dockerfile's CMD to enable --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # The "Hands" of our application
+  browser_service:
+    build: ./services/browser_service
+    ports:
+      - "8001:8001"
+    volumes:
+      # This mounts your local code into the container for live-reloading
+      - ./services/browser_service/app:/app/app
+    # The command overrides the Dockerfile's CMD to enable --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
