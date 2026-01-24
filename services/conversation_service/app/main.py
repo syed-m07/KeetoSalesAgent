@@ -1,39 +1,67 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from .agent import get_agent_response # Import the agent function
+from fastapi.responses import Response
+from pydantic import BaseModel
+from typing import Optional
 
-app = FastAPI()
+from .agent import get_agent_response
+from .voice import text_to_speech, get_available_voices
+
+
+app = FastAPI(
+    title="Conversation Service",
+    description="The 'Brain' of the AI Agent - LLM + Voice",
+    version="2.0.0",
+)
+
+
+class SpeakRequest(BaseModel):
+    text: str
+    voice: Optional[str] = None
+
 
 @app.get("/health")
 async def health_check():
-    """
-    A simple health check endpoint that returns a success message.
-    Used by monitoring tools to verify that the service is running.
-    """
+    """Health check endpoint."""
     return {"status": "ok"}
+
+
+@app.get("/voices")
+def list_voices():
+    """List available TTS languages."""
+    voices = get_available_voices()
+    return {"voices": voices}
+
+
+@app.post("/speak")
+async def speak(request: SpeakRequest):
+    """
+    Convert text to speech and return audio.
+    Returns MP3 audio bytes.
+    """
+    audio_bytes = await text_to_speech(
+        request.text,
+        lang=request.voice or "en"
+    )
+    return Response(
+        content=audio_bytes,
+        media_type="audio/mpeg",
+        headers={"Content-Disposition": "inline; filename=speech.mp3"}
+    )
 
 
 @app.websocket("/ws/chat")
 async def websocket_endpoint(websocket: WebSocket):
-    """
-    The main WebSocket endpoint for handling chat connections.
-    """
+    """WebSocket endpoint for chat conversations."""
     await websocket.accept()
     print("Client connected to chat endpoint")
     try:
         while True:
-            # Receive message from the client
             user_input = await websocket.receive_text()
-            
-            # Get response from the agent
             agent_response = get_agent_response(user_input)
-            
-            # Send response back to the client
             await websocket.send_text(agent_response)
 
     except WebSocketDisconnect:
         print("Client disconnected")
     except Exception as e:
         print(f"An error occurred: {e}")
-        # Optionally, send an error message to the client
         await websocket.close(code=1011, reason="An internal error occurred.")
-

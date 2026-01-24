@@ -1,89 +1,199 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
+
+const BROWSER_STREAM_URL = 'http://localhost:8001/stream';
+const TTS_URL = 'http://localhost:8000/speak';
+const WS_URL = 'ws://localhost:8000/ws/chat';
 
 function App() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [socket, setSocket] = useState(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const chatWindowRef = useRef(null);
+  const audioRef = useRef(null);
 
+  // Initialize WebSocket connection
   useEffect(() => {
-    // Initialize WebSocket connection
-    // The backend server runs on port 8000 by default
-    const ws = new WebSocket('ws://localhost:8000/ws/chat');
+    const ws = new WebSocket(WS_URL);
 
     ws.onopen = () => {
-      console.log('WebSocket connection established');
+      console.log('✅ Connected to AI Agent');
       setSocket(ws);
-      setMessages([{ sender: 'agent', text: 'Hello! How can I help you today?' }]);
+      setIsConnected(true);
+      setMessages([{
+        sender: 'agent',
+        text: 'Hello! I\'m your AI Sales Agent. I can browse the web and help you with research. Try asking me to "go to google.com" or "what page am I on?"'
+      }]);
     };
 
-    ws.onmessage = (event) => {
-      setMessages(prevMessages => [...prevMessages, { sender: 'agent', text: event.data }]);
+    ws.onmessage = async (event) => {
+      setIsLoading(false);
+      const agentResponse = event.data;
+      setMessages(prev => [...prev, { sender: 'agent', text: agentResponse }]);
+
+      // Auto-play TTS for agent responses
+      await speakText(agentResponse);
     };
 
     ws.onclose = () => {
-      console.log('WebSocket connection closed');
+      console.log('❌ Disconnected from AI Agent');
       setSocket(null);
+      setIsConnected(false);
     };
 
     ws.onerror = (error) => {
       console.error('WebSocket error:', error);
+      setIsConnected(false);
     };
 
-    // Clean up the connection when the component unmounts
     return () => {
-      if (ws.readyState === 1) { // <-- This is important
-        ws.close();
-      }
+      if (ws.readyState === 1) ws.close();
     };
   }, []);
 
+  // Auto-scroll chat
   useEffect(() => {
-    // Scroll to the bottom of the chat window when new messages arrive
     if (chatWindowRef.current) {
       chatWindowRef.current.scrollTop = chatWindowRef.current.scrollHeight;
     }
   }, [messages]);
 
+  // Text-to-Speech function
+  const speakText = useCallback(async (text) => {
+    if (!text || text.length > 500) return; // Skip long texts
+
+    try {
+      setIsSpeaking(true);
+      const response = await fetch(TTS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text.substring(0, 200) }) // Limit for faster TTS
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const audioUrl = URL.createObjectURL(blob);
+        if (audioRef.current) {
+          audioRef.current.src = audioUrl;
+          audioRef.current.play().catch(e => console.log('Audio play blocked:', e));
+        }
+      }
+    } catch (error) {
+      console.error('TTS error:', error);
+    } finally {
+      setIsSpeaking(false);
+    }
+  }, []);
+
+  // Send message
   const sendMessage = () => {
-    if (input.trim() && socket) {
-      const message = { sender: 'user', text: input };
-      setMessages(prevMessages => [...prevMessages, message]);
+    if (input.trim() && socket && isConnected) {
+      setMessages(prev => [...prev, { sender: 'user', text: input }]);
       socket.send(input);
       setInput('');
+      setIsLoading(true);
     }
   };
 
   const handleKeyPress = (event) => {
-    if (event.key === 'Enter') {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
       sendMessage();
     }
   };
 
   return (
-    <div className="App">
-      <h1>Conversational AI Agent</h1>
-      <div className="chat-window" ref={chatWindowRef}>
-        {messages.map((msg, index) => (
-          <div key={index} className={`message ${msg.sender}`}>
-            {msg.text}
+    <div className="app">
+      {/* Background gradient */}
+      <div className="bg-gradient"></div>
+
+      {/* Main Layout */}
+      <div className="main-container">
+        {/* Header */}
+        <header className="header">
+          <div className="logo">
+            <span className="logo-icon">🤖</span>
+            <h1>Keeto Sales Agent</h1>
           </div>
-        ))}
+          <div className={`status ${isConnected ? 'connected' : 'disconnected'}`}>
+            <span className="status-dot"></span>
+            {isConnected ? 'Connected' : 'Disconnected'}
+          </div>
+        </header>
+
+        {/* Content Area */}
+        <div className="content">
+          {/* Browser View Panel */}
+          <div className="panel browser-panel">
+            <div className="panel-header">
+              <span>🌐 Browser View</span>
+            </div>
+            <div className="browser-frame">
+              <img
+                src={BROWSER_STREAM_URL}
+                alt="Live Browser"
+                className="browser-stream"
+                onError={(e) => e.target.style.display = 'none'}
+              />
+            </div>
+          </div>
+
+          {/* Chat Panel */}
+          <div className="panel chat-panel">
+            <div className="panel-header">
+              <span>💬 Chat</span>
+              {isSpeaking && <span className="speaking-indicator">🔊</span>}
+            </div>
+
+            <div className="chat-messages" ref={chatWindowRef}>
+              {messages.map((msg, index) => (
+                <div key={index} className={`message ${msg.sender}`}>
+                  <div className="message-avatar">
+                    {msg.sender === 'user' ? '👤' : '🤖'}
+                  </div>
+                  <div className="message-content">
+                    {msg.text}
+                  </div>
+                </div>
+              ))}
+              {isLoading && (
+                <div className="message agent">
+                  <div className="message-avatar">🤖</div>
+                  <div className="message-content loading">
+                    <span className="dot"></span>
+                    <span className="dot"></span>
+                    <span className="dot"></span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="chat-input-area">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder={isConnected ? "Ask me anything..." : "Connecting..."}
+                disabled={!isConnected || isLoading}
+              />
+              <button
+                onClick={sendMessage}
+                disabled={!isConnected || isLoading || !input.trim()}
+                className="send-btn"
+              >
+                {isLoading ? '...' : '→'}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
-      <div className="chat-input">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder="Type your message..."
-          disabled={!socket}
-        />
-        <button onClick={sendMessage} disabled={!socket}>
-          Send
-        </button>
-      </div>
+
+      {/* Hidden audio element for TTS */}
+      <audio ref={audioRef} onEnded={() => setIsSpeaking(false)} />
     </div>
   );
 }

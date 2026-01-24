@@ -5,9 +5,10 @@ Provides browser automation capabilities via Playwright.
 import asyncio
 import base64
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Optional, AsyncGenerator
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from playwright.async_api import async_playwright, Browser, Page, Playwright
 
@@ -148,6 +149,15 @@ class BrowserManager:
                 "url": self.page.url,
                 "title": await self.page.title(),
             }
+    
+    async def get_frame(self) -> bytes:
+        """Capture current page as JPEG bytes for streaming."""
+        # Don't lock here - we want non-blocking frame capture for streaming
+        try:
+            return await self.page.screenshot(type="jpeg", quality=70)
+        except Exception:
+            # Return empty bytes on error (page may be navigating)
+            return b""
 
 
 # Global browser manager instance
@@ -178,6 +188,30 @@ app = FastAPI(
 async def health_check():
     """Health check endpoint."""
     return {"status": "ok", "service": "browser"}
+
+
+async def generate_mjpeg_frames() -> AsyncGenerator[bytes, None]:
+    """Generate MJPEG frames for streaming."""
+    while True:
+        frame = await browser_manager.get_frame()
+        if frame:
+            yield (
+                b"--frame\r\n"
+                b"Content-Type: image/jpeg\r\n\r\n" + frame + b"\r\n"
+            )
+        await asyncio.sleep(0.1)  # ~10 FPS
+
+
+@app.get("/stream")
+async def stream_browser():
+    """
+    Stream the browser view as MJPEG.
+    Open in browser or use in <img> tag: <img src="http://localhost:8001/stream" />
+    """
+    return StreamingResponse(
+        generate_mjpeg_frames(),
+        media_type="multipart/x-mixed-replace; boundary=frame"
+    )
 
 
 @app.get("/page-info", response_model=BrowserActionResponse)
