@@ -3,8 +3,10 @@ Browser Tools for LangChain Agent.
 Provides tools that allow the agent to control the browser service.
 """
 import os
-import httpx
 from typing import Optional
+
+import httpx
+from langchain.tools import Tool
 
 
 BROWSER_SERVICE_URL = os.getenv("BROWSER_SERVICE_URL", "http://browser_service:8001")
@@ -142,8 +144,6 @@ def get_current_page_info() -> str:
 
 
 # --- LangChain Tool Definitions ---
-
-from langchain.tools import Tool
 
 browser_tools = [
     Tool(

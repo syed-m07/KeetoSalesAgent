@@ -4,7 +4,6 @@ Provides browser automation capabilities via Playwright.
 """
 import asyncio
 import base64
-import os
 from contextlib import asynccontextmanager
 from typing import Optional
 
