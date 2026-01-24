@@ -76,10 +76,43 @@ def click_element(selector: str) -> str:
     try:
         result = _call_browser_api_sync("/click", data={"selector": selector})
         if result.get("success"):
-            return f"Successfully clicked element: {selector}"
+            return f"Successfully clicked element. [Give Final Answer NOW - say 'I clicked the button.']"
         return f"Failed to click: {result.get('message', 'Unknown error')}"
     except Exception as e:
         return f"Error clicking {selector}: {str(e)}"
+
+
+def _smart_click(input_str: str) -> str:
+    """
+    Smart click function that handles various input formats.
+    If input mentions 'search', tries common search button selectors.
+    """
+    input_str = input_str.strip().strip("'\"")
+    
+    # If it looks like a selector (has special chars), use directly
+    if any(c in input_str for c in ['#', '.', '[', ']', '>', ' ']):
+        return click_element(input_str)
+    
+    # Check if user wants to click search
+    if 'search' in input_str.lower():
+        search_selectors = [
+            'button#search-icon-legacy',  # YouTube search button
+            'button[aria-label="Search"]',  # YouTube
+            'input[type="submit"]',  # Google
+            'button[type="submit"]',  # Generic
+            'button[aria-label="Google Search"]',  # Google
+        ]
+        for selector in search_selectors:
+            try:
+                result = click_element(selector)
+                if "Successfully" in result:
+                    return result
+            except Exception:
+                continue
+        return "Could not find search button. The search may have already been submitted."
+    
+    # Try the input as a selector anyway
+    return click_element(input_str)
 
 
 def type_into_field(selector: str, text: str) -> str:
@@ -96,7 +129,7 @@ def type_into_field(selector: str, text: str) -> str:
     try:
         result = _call_browser_api_sync("/type", data={"selector": selector, "text": text})
         if result.get("success"):
-            return f"Successfully typed '{text}' into {selector}"
+            return f"Successfully typed '{text}' into the search field. [Give Final Answer NOW - say 'I typed {text} in the search field.']"
         return f"Failed to type: {result.get('message', 'Unknown error')}"
     except Exception as e:
         return f"Error typing into {selector}: {str(e)}"
@@ -118,9 +151,10 @@ def get_page_text(selector: Optional[str] = None) -> str:
         if result.get("success"):
             text = result.get("data", {}).get("text", "")
             # Truncate if too long for the LLM context
-            if len(text) > 2000:
-                text = text[:2000] + "... [truncated]"
-            return text or "No text content found."
+            if len(text) > 1000:
+                text = text[:1000] + "..."
+            # Add stop instruction to prevent agent from looping
+            return f"{text}\n\n[IMPORTANT: You have the page content. Give Final Answer NOW. Do NOT call more tools.]"
         return f"Failed to get text: {result.get('message', 'Unknown error')}"
     except Exception as e:
         return f"Error getting text: {str(e)}"
@@ -143,6 +177,38 @@ def get_current_page_info() -> str:
         return f"Error getting page info: {str(e)}"
 
 
+def _smart_type(input_str: str) -> str:
+    """
+    Smart type function that handles various input formats.
+    If no selector provided, tries common search input selectors.
+    """
+    input_str = input_str.strip().strip("'\"")
+    
+    # If format is "selector|text", use as-is
+    if "|" in input_str:
+        parts = input_str.split("|", 1)
+        return type_into_field(parts[0].strip(), parts[1].strip())
+    
+    # Otherwise, try common search selectors
+    text = input_str
+    common_selectors = [
+        'input[name="search_query"]',  # YouTube
+        'textarea[name="q"]',           # Google
+        'input[name="q"]',              # Google fallback
+        'input[type="search"]',         # Generic
+        'input[placeholder*="earch"]',  # Generic with "Search" placeholder
+    ]
+    
+    for selector in common_selectors:
+        try:
+            result = type_into_field(selector, text)
+            if "Successfully" in result:
+                return result
+        except Exception:
+            continue
+    
+    return f"Could not find a search input field. Try specifying the selector: 'selector|{text}'"
+
 # --- LangChain Tool Definitions ---
 
 browser_tools = [
@@ -153,13 +219,13 @@ browser_tools = [
     ),
     Tool(
         name="click_element",
-        func=click_element,
-        description="Click an element on the current page. Input should be a CSS selector like 'button.submit' or '#login-btn'."
+        func=_smart_click,
+        description="Click a button or element. For search buttons, just say 'search'. For other elements, provide a CSS selector."
     ),
     Tool(
         name="type_text",
-        func=lambda x: type_into_field(*x.split("|", 1)) if "|" in x else "Error: Use format 'selector|text'",
-        description="Type text into an input field. Input format: 'selector|text' (e.g., 'input[name=search]|hello world')."
+        func=lambda x: _smart_type(x),
+        description="Type text into a search or input field. Input format: 'text to type' OR 'selector|text'. Examples: 'hello world' or 'input[name=search]|hello'."
     ),
     Tool(
         name="get_page_text",

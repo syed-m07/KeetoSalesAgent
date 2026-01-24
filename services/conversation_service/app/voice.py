@@ -2,8 +2,6 @@
 Voice Module - Text-to-Speech utilities.
 Uses gTTS (Google Text-to-Speech) for reliable TTS in containers.
 """
-import tempfile
-import os
 from io import BytesIO
 
 from gtts import gTTS
