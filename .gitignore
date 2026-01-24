@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 Proposed Architecture and Components.pdf
 context_for_gemini.txt
+.agent/
 
 # C extensions
 *.so

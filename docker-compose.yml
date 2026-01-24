@@ -1,24 +1,72 @@
-
-
 services:
-  # The "Brain" of our application
+  # NOTE: Using EXTERNAL ollama container (already running with models)
+  # If you don't have ollama running externally, uncomment the ollama service below.
+  #
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: ollama
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 5
+  #   restart: unless-stopped
+
+  # === Database ===
+  postgres:
+    image: postgres:13-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_USER: agent_user
+      POSTGRES_PASSWORD: agent_password
+      POSTGRES_DB: agent_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U agent_user -d agent_db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # === The "Brain" ===
   conversation_service:
     build: ./services/conversation_service
+    container_name: conversation_service
     ports:
       - "8000:8000"
+    environment:
+      # Use host.docker.internal to reach external ollama container
+      OLLAMA_HOST: http://host.docker.internal:11434
+      OLLAMA_MODEL: llama3.2:3b
+      DATABASE_URL: postgresql://agent_user:agent_password@postgres:5432/agent_db
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
-      # This mounts your local code into the container for live-reloading
       - ./services/conversation_service/app:/app/app
-    # The command overrides the Dockerfile's CMD to enable --reload
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
-  # The "Hands" of our application
+  # === The "Hands" ===
   browser_service:
     build: ./services/browser_service
+    container_name: browser_service
     ports:
       - "8001:8001"
     volumes:
-      # This mounts your local code into the container for live-reloading
       - ./services/browser_service/app:/app/app
-    # The command overrides the Dockerfile's CMD to enable --reload
     command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+  postgres_data:

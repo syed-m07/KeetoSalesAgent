@@ -4,6 +4,11 @@ FROM python:3.10-slim
 # Set the working directory inside the container
 WORKDIR /app
 
+# Install system dependencies (curl for healthchecks)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy the requirements file into the container
 COPY requirements.txt .
 
@@ -11,7 +16,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy our application code into the container
-COPY ./app .
+# Creates /app/app structure for proper module import
+COPY ./app ./app
 
 # Expose the port the app will run on
 EXPOSE 8000

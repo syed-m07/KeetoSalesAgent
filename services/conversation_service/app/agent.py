@@ -1,29 +1,37 @@
+import os
 from langchain_community.chat_models import ChatOllama
 from langchain.chains import ConversationChain
-from langchain.memory import ConversationSummaryBufferMemory 
+from langchain.memory import ConversationSummaryBufferMemory
 
-# Initialize the LLM
-llm = ChatOllama(model="llama3.2:3b", temperature=0.3)
+# --- Configuration from Environment ---
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
 
-# Initialize conversation memory
-# This memory summarizes older parts of the conversation once the token limit is reached.
-# It needs the LLM to do the summarization.
+# Initialize the LLM pointing to the Ollama container
+llm = ChatOllama(
+    model=OLLAMA_MODEL,
+    base_url=OLLAMA_HOST,
+    temperature=0.3,
+)
+
+# Conversation memory with summarization
 memory = ConversationSummaryBufferMemory(llm=llm, max_token_limit=1000)
 
-# Initialize the conversation chain
+# Conversation chain orchestrating LLM + Memory
 conversation_chain = ConversationChain(
     llm=llm,
     memory=memory,
-    verbose=True  
+    verbose=True,
 )
+
 
 def get_agent_response(user_input: str) -> str:
     """
     Gets a response from the conversational agent.
-    
+
     Args:
         user_input: The text from the user.
-        
+
     Returns:
         The agent's response.
     """
