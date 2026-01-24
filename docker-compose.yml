@@ -46,6 +46,7 @@ services:
       OLLAMA_HOST: http://host.docker.internal:11434
       OLLAMA_MODEL: llama3.2:3b
       DATABASE_URL: postgresql://agent_user:agent_password@postgres:5432/agent_db
+      BROWSER_SERVICE_URL: http://browser_service:8001
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -54,6 +55,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      browser_service:
+        condition: service_started
     restart: unless-stopped
 
   # === The "Hands" ===
