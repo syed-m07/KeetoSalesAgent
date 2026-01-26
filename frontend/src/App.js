@@ -12,6 +12,7 @@ function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isBrowserActive, setIsBrowserActive] = useState(false);
   const chatWindowRef = useRef(null);
   const audioRef = useRef(null);
 
@@ -33,6 +34,11 @@ function App() {
       setIsLoading(false);
       const agentResponse = event.data;
       setMessages(prev => [...prev, { sender: 'agent', text: agentResponse }]);
+
+      // Activate browser stream if agent navigated
+      if (agentResponse.toLowerCase().includes('navigated') || agentResponse.toLowerCase().includes('go to')) {
+        setIsBrowserActive(true);
+      }
 
       // Auto-play TTS for agent responses
       await speakText(agentResponse);
@@ -116,7 +122,7 @@ function App() {
         <header className="header">
           <div className="logo">
             <span className="logo-icon">🤖</span>
-            <h1>Keeto Sales Agent</h1>
+            <h1>Keeto Demo Agent</h1>
           </div>
           <div className={`status ${isConnected ? 'connected' : 'disconnected'}`}>
             <span className="status-dot"></span>
@@ -132,12 +138,22 @@ function App() {
               <span>🌐 Browser View</span>
             </div>
             <div className="browser-frame">
-              <img
-                src={BROWSER_STREAM_URL}
-                alt="Live Browser"
-                className="browser-stream"
-                onError={(e) => e.target.style.display = 'none'}
-              />
+              {isBrowserActive ? (
+                <img
+                  src={BROWSER_STREAM_URL}
+                  alt="Live Browser"
+                  className="browser-stream"
+                  onError={(e) => e.target.style.display = 'none'}
+                />
+              ) : (
+                <div className="browser-placeholder">
+                  <div className="placeholder-content">
+                    <span className="placeholder-icon">🖥️</span>
+                    <h3>Ready to Browse</h3>
+                    <p>Ask me to navigate to a website to see the live view.</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -152,7 +168,7 @@ function App() {
               {messages.map((msg, index) => (
                 <div key={index} className={`message ${msg.sender}`}>
                   <div className="message-avatar">
-                    {msg.sender === 'user' ? '👤' : '🤖'}
+                    {msg.sender === 'user' ? '👤' : <img src="/avatar.png" alt="Agent" />}
                   </div>
                   <div className="message-content">
                     {msg.text}
@@ -161,7 +177,7 @@ function App() {
               ))}
               {isLoading && (
                 <div className="message agent">
-                  <div className="message-avatar">🤖</div>
+                  <div className="message-avatar"><img src="/avatar.png" alt="Agent" /></div>
                   <div className="message-content loading">
                     <span className="dot"></span>
                     <span className="dot"></span>
