@@ -124,13 +124,34 @@ def get_agent_response(user_input: str) -> str:
                 # Get the last successful action result
                 last_action, last_result = steps[-1]
                 action_name = last_action.tool
-                # Return a meaningful message based on what was done
-                if "typed" in str(last_result).lower() or action_name == "type_text":
+                result_str = str(last_result)
+                
+                # Return meaningful response based on tool and its actual result
+                if action_name == "type_text":
                     return "Done! I typed your text in the search field."
                 elif action_name == "navigate_browser":
                     return "I navigated to the page."
+                elif action_name == "click_element":
+                    if "success" in result_str.lower():
+                        return "Done! I clicked the button. The page may be loading new content."
+                    return f"I tried to click but: {result_str[:200]}"
+                elif action_name == "get_page_text":
+                    # Extract actual page content and return it
+                    if "[IMPORTANT" in result_str:
+                        # Remove our stop instruction from the output
+                        clean_result = result_str.split("[IMPORTANT")[0].strip()
+                    else:
+                        clean_result = result_str
+                    if len(clean_result) > 500:
+                        clean_result = clean_result[:500] + "..."
+                    return f"Here's what I see on the page:\n\n{clean_result}"
+                elif action_name == "get_page_info":
+                    return f"Current page: {result_str}"
                 else:
-                    return f"I completed the action: {action_name}"
+                    # Return the actual result, not just action name
+                    if len(result_str) > 300:
+                        result_str = result_str[:300] + "..."
+                    return result_str
             return "I processed your request but couldn't generate a response."
         
         return output
