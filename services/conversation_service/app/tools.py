@@ -76,7 +76,7 @@ def click_element(selector: str) -> str:
     try:
         result = _call_browser_api_sync("/click", data={"selector": selector})
         if result.get("success"):
-            return f"Successfully clicked element. [Give Final Answer NOW - say 'I clicked the button.']"
+            return "Successfully clicked element. [Give Final Answer NOW - say 'I clicked the button.']"
         return f"Failed to click: {result.get('message', 'Unknown error')}"
     except Exception as e:
         return f"Error clicking {selector}: {str(e)}"

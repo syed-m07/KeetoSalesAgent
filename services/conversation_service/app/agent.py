@@ -126,9 +126,9 @@ def get_agent_response(user_input: str) -> str:
                 action_name = last_action.tool
                 # Return a meaningful message based on what was done
                 if "typed" in str(last_result).lower() or action_name == "type_text":
-                    return f"Done! I typed your text in the search field."
+                    return "Done! I typed your text in the search field."
                 elif action_name == "navigate_browser":
-                    return f"I navigated to the page."
+                    return "I navigated to the page."
                 else:
                     return f"I completed the action: {action_name}"
             return "I processed your request but couldn't generate a response."
