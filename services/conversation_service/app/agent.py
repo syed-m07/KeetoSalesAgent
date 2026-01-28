@@ -9,6 +9,8 @@ from langchain.memory import ConversationBufferWindowMemory
 from langchain_core.prompts import PromptTemplate
 
 from .tools import browser_tools
+from .enrichment_tools import enrichment_tools
+from .crm_tools import crm_tools
 
 # --- Configuration from Environment ---
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama").lower()  # "ollama" or "groq"
@@ -16,6 +18,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
+ENRICHMENT_SERVICE_URL = os.getenv("ENRICHMENT_SERVICE_URL", "http://enrichment_service:8002")
 
 
 def get_llm():
@@ -81,10 +84,13 @@ Chat History: {chat_history}
 Question: {input}
 {agent_scratchpad}""")
 
+# Combine all tools
+all_tools = browser_tools + enrichment_tools + crm_tools
+
 # Create the ReAct agent
 agent = create_react_agent(
     llm=llm,
-    tools=browser_tools,
+    tools=all_tools,
     prompt=REACT_PROMPT,
 )
 
@@ -93,7 +99,7 @@ timeout = 60 if LLM_PROVIDER == "groq" else 300
 
 agent_executor = AgentExecutor(
     agent=agent,
-    tools=browser_tools,
+    tools=all_tools,
     memory=memory,
     verbose=True,
     handle_parsing_errors="Give Final Answer now with what you know.",

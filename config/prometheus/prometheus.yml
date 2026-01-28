@@ -1,0 +1,28 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'conversation_service'
+    static_configs:
+      - targets: ['conversation_service:8000']
+    metrics_path: /metrics
+
+  - job_name: 'browser_service'
+    static_configs:
+      - targets: ['browser_service:8001']
+    metrics_path: /metrics
+
+  - job_name: 'enrichment_service'
+    static_configs:
+      - targets: ['enrichment_service:8002']
+    metrics_path: /metrics
+
+  - job_name: 'crm_service'
+    static_configs:
+      - targets: ['crm_service:8003']
+    metrics_path: /metrics

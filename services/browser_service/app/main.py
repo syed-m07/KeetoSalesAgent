@@ -183,6 +183,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Prometheus metrics
+from prometheus_fastapi_instrumentator import Instrumentator
+Instrumentator().instrument(app).expose(app)
+
 
 @app.get("/health")
 async def health_check():
