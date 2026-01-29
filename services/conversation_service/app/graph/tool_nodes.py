@@ -2,16 +2,13 @@
 Tool Nodes for LangGraph.
 These nodes wrap existing tools from the original agent.
 """
-import os
 import re
-from langchain_core.messages import AIMessage, HumanMessage
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import AIMessage
 
 from .state import AgentState
-from .nodes import llm
 
 # Import the actual tool functions directly
-from ..tools import navigate_to_url, click_element, get_page_text, get_current_page_info, _smart_type, _smart_click
+from ..tools import navigate_to_url, get_current_page_info, _smart_type, _smart_click
 from ..enrichment_tools import enrichment_tools
 from ..crm_tools import crm_tools
 

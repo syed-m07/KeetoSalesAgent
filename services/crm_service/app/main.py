@@ -6,6 +6,7 @@ from typing import List
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Depends
+from prometheus_fastapi_instrumentator import Instrumentator
 from sqlalchemy.orm import Session
 import logging
 
@@ -27,7 +28,6 @@ app = FastAPI(
 )
 
 # Prometheus metrics
-from prometheus_fastapi_instrumentator import Instrumentator
 Instrumentator().instrument(app).expose(app)
 
 

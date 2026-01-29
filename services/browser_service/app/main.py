@@ -9,6 +9,7 @@ from typing import Optional, AsyncGenerator
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 from playwright.async_api import async_playwright, Browser, Page, Playwright
 
@@ -184,7 +185,6 @@ app = FastAPI(
 )
 
 # Prometheus metrics
-from prometheus_fastapi_instrumentator import Instrumentator
 Instrumentator().instrument(app).expose(app)
 
 

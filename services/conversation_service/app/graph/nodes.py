@@ -4,7 +4,7 @@ Each node is a function that takes AgentState and returns a partial update.
 """
 import os
 from typing import Literal
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from .state import AgentState

@@ -4,6 +4,7 @@ Uses Google Search to find information about companies/prospects.
 """
 
 from fastapi import FastAPI, HTTPException
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 from typing import Optional
 import logging
@@ -21,7 +22,6 @@ app = FastAPI(
 )
 
 # Prometheus metrics
-from prometheus_fastapi_instrumentator import Instrumentator
 Instrumentator().instrument(app).expose(app)
 
 

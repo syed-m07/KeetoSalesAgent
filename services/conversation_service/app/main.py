@@ -2,6 +2,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
+from prometheus_fastapi_instrumentator import Instrumentator
 from typing import Optional
 import uuid
 
@@ -26,7 +27,6 @@ app.add_middleware(
 )
 
 # Prometheus metrics
-from prometheus_fastapi_instrumentator import Instrumentator
 Instrumentator().instrument(app).expose(app)
 
 
