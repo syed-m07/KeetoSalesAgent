@@ -10,4 +10,7 @@ def test_health_check():
     """
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["version"] == "3.0.0"
+    assert data["engine"] == "langgraph"
