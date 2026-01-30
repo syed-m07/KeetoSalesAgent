@@ -64,27 +64,51 @@ def get_postgres_checkpointer():
     """
     Creates a PostgresSaver for conversation persistence.
     Uses the existing postgres container.
+    
+    The PostgresSaver requires:
+    - autocommit=True (required for setup() to create indexes)
+    - row_factory=dict_row (required for checkpoint operations)
     """
+    from psycopg_pool import ConnectionPool
+    from psycopg.rows import dict_row
+    from psycopg import Connection
+    
     db_url = os.getenv(
         "DATABASE_URL",
         "postgresql://agent_user:agent_password@postgres:5432/agent_db"
     )
     
     try:
-        # Convert to connection string format for psycopg3
-        # langgraph-checkpoint-postgres uses psycopg3
-        from psycopg_pool import ConnectionPool
+        # First, run setup with a single connection (required for CREATE INDEX CONCURRENTLY)
+        print("📦 Setting up checkpoint tables...")
+        with Connection.connect(
+            db_url, autocommit=True, prepare_threshold=0, row_factory=dict_row
+        ) as conn:
+            temp_checkpointer = PostgresSaver(conn)
+            temp_checkpointer.setup()
+        print("✅ Checkpoint tables created/verified")
         
-        pool = ConnectionPool(conninfo=db_url)
+        # Now create a connection pool for runtime use
+        # Configure pool to use autocommit and dict_row
+        pool = ConnectionPool(
+            conninfo=db_url,
+            kwargs={
+                "autocommit": True,
+                "prepare_threshold": 0,
+                "row_factory": dict_row,
+            },
+            min_size=1,
+            max_size=5,
+        )
+        
         checkpointer = PostgresSaver(pool)
-        
-        # Setup tables if they don't exist
-        checkpointer.setup()
-        
-        print("✅ Postgres checkpointer initialized")
+        print("✅ Postgres checkpointer initialized with connection pool")
         return checkpointer
+        
     except Exception as e:
         print(f"⚠️ Failed to initialize Postgres checkpointer: {e}")
+        import traceback
+        traceback.print_exc()
         print("  Falling back to memory-only mode")
         return None
 
