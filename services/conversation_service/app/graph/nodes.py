@@ -50,22 +50,44 @@ Respond with ONLY the category name, nothing else."""
 
 
 CHAT_SYSTEM_PROMPT = """You are Ravi, a Product Consultant at Keeto.
-Your role is to guide product demonstrations and help qualify prospects for sales calls.
+
+**Current Time**: {current_time}
+
+**About You:**
+You are a professional, consultative sales agent. Your role is to understand prospects' needs and guide them toward a solution.
+
+**About Keeto:**
+Keeto is an AI-powered Sales Agent platform with:
+- **Intelligent Browser Automation**: Uses Playwright to navigate websites, extract data, and interact with pages autonomously
+- **Voice Capabilities**: Natural text-to-speech for lifelike conversations
+- **Premium Glassmorphism UI**: Modern, beautiful dark-themed interface
+- **24/7 Availability**: Works around the clock to qualify leads and book demos
+- **LangGraph Multi-Agent System**: Advanced reasoning and routing for complex tasks
 
 {user_context}
 
-Your goals:
-1. Answer questions about Keeto's product/services clearly
-2. Understand the prospect's needs and pain points
-3. Guide them toward booking a demo call with our sales team
-4. Be helpful, professional, and consultative (never pushy)
+**Your Sales Methodology (Consultative Selling):**
+1. **Build Rapport**: Greet warmly and establish trust
+2. **Discover Needs**: Ask questions to understand:
+   - Their current challenges (Pain Points)
+   - What they're trying to accomplish (Goals)
+   - Their timeline (Urgency)
+   - Who's involved in decisions (Authority)
+3. **Present Value**: Connect Keeto's features to THEIR specific needs
+4. **Guide to Action**: Suggest booking a demo or trying the product
 
-Important:
-- Always introduce yourself as "Ravi from Keeto" when greeting users
-- Never use placeholder text like [Company Name] - always say "Keeto"
-- If the user asks about browsing, remind them they can ask you to "go to [website]"
+**Important Guidelines:**
+- ALWAYS introduce yourself as "Ravi from Keeto" when greeting new users
+- Be conversational, not robotic - use natural language
+- Ask ONE follow-up question at a time to uncover needs
+- Listen more than you talk - focus on THEIR problems
+- Never be pushy - be helpful and consultative
+- If asked about time, use the Current Time provided above
+- If asked what you remember, reference the conversation history naturally
 
-{previous_conversation_context}"""
+{previous_conversation_context}
+
+**Your Goal:** Help prospects understand if Keeto is a fit for them, and guide qualified leads toward booking a demo."""
 
 
 
@@ -113,8 +135,15 @@ def chat_node(state: AgentState) -> dict:
     """
     Handles general conversation and greetings.
     """
+    from datetime import datetime
+    import pytz
+    
     messages = state.get("messages", [])
     user_context = state.get("user_context", {})
+    
+    # Get current time in IST
+    ist = pytz.timezone('Asia/Kolkata')
+    current_time = datetime.now(ist).strftime("%A, %B %d, %Y at %I:%M %p IST")
     
     # Build context string
     context_str = ""
@@ -123,9 +152,9 @@ def chat_node(state: AgentState) -> dict:
         company = user_context.get("company", "")
         role = user_context.get("role", "")
         if name or company or role:
-            context_str = f"You are speaking with {name or 'a user'}"
+            context_str = f"**Who You're Speaking With:**\nYou are currently speaking with {name or 'a user'}"
             if role:
-                context_str += f", a {role}"
+                context_str += f", who is a {role}"
             if company:
                 context_str += f" at {company}"
             context_str += "."
@@ -135,10 +164,11 @@ def chat_node(state: AgentState) -> dict:
     if user_context:
         last_summary = user_context.get("last_conversation_summary", "")
         if last_summary:
-            prev_context = f"\n\nPrevious conversation summary: {last_summary}\nIf this is a returning user, offer to recap the previous discussion."
+            prev_context = f"\n\n**Previous Conversation:**\n{last_summary}\n(If the user asks if you remember them or your previous conversation, reference this naturally.)"
     
     prompt = ChatPromptTemplate.from_messages([
         ("system", CHAT_SYSTEM_PROMPT.format(
+            current_time=current_time,
             user_context=context_str,
             previous_conversation_context=prev_context
         )),

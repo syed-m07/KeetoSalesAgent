@@ -136,7 +136,7 @@ def get_graph():
 
 def invoke_graph(
     user_input: str,
-    session_id: str = None,
+    thread_id: str = None,
     user_context: dict = None,
 ) -> str:
     """
@@ -144,7 +144,7 @@ def invoke_graph(
     
     Args:
         user_input: The user's message.
-        session_id: Optional session ID for persistence.
+        thread_id: Thread ID for persistence (should be user-based for auth users).
         user_context: Optional user context dict with name, company, role, email.
     
     Returns:
@@ -154,22 +154,22 @@ def invoke_graph(
     
     graph = get_graph()
     
-    # Generate session ID if not provided
-    if not session_id:
-        session_id = str(uuid.uuid4())
+    # Generate thread ID if not provided
+    if not thread_id:
+        thread_id = str(uuid.uuid4())
     
     # Build initial state with user context
     initial_state = {
         "messages": [HumanMessage(content=user_input)],
         "user_context": user_context,
-        "session_id": session_id,
+        "session_id": thread_id,  # Keep state field name for now
         "current_url": None,
         "lead_score": 0,
         "next_action": None,
     }
     
-    # Config for checkpointer
-    config = {"configurable": {"thread_id": session_id}}
+    # Config for checkpointer - use thread_id for persistence
+    config = {"configurable": {"thread_id": thread_id}}
     
     try:
         # Invoke the graph

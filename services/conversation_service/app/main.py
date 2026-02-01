@@ -191,12 +191,12 @@ async def websocket_endpoint(
     """
     await websocket.accept()
 
-    # Generate a unique session ID for this connection
-    session_id = str(uuid.uuid4())
-    _sessions[id(websocket)] = {"session_id": session_id, "user_context": None}
-
-    # If token provided, try to authenticate and get user context
+    # Determine thread_id based on authentication
+    # For authenticated users, use a constant user-based ID for persistent memory
+    # For guests, use a random UUID (memory will not persist across sessions)
+    thread_id = None
     user_context = None
+    
     if token:
         user_id = verify_token(token)
         if user_id:
@@ -206,12 +206,17 @@ async def websocket_endpoint(
                 user = db.query(User).filter(User.id == user_id).first()
                 if user:
                     user_context = user.to_context_dict()
-                    _sessions[id(websocket)]["user_context"] = user_context
-                    print(f"🔐 Authenticated user: {user.name} ({user.email})")
+                    thread_id = f"user_{user.id}"  # Persistent thread ID
+                    print(f"🔐 Authenticated user: {user.name} ({user.email}) | Thread: {thread_id}")
             finally:
                 db.close()
+    
+    # Fallback to random session for guests
+    if not thread_id:
+        thread_id = str(uuid.uuid4())
+        print(f"👤 Guest session - Thread: {thread_id}")
 
-    greeting = f"Session: {session_id}"
+    greeting = f"Thread: {thread_id}"
     if user_context:
         greeting += f" | User: {user_context['name']}"
     print(f"🧠 Client connected - {greeting}")
@@ -220,19 +225,17 @@ async def websocket_endpoint(
         while True:
             user_input = await websocket.receive_text()
 
-            # Invoke the LangGraph agent with user context
+            # Invoke the LangGraph agent with user context and thread_id
             agent_response = invoke_graph(
                 user_input,
-                session_id=session_id,
+                thread_id=thread_id,
                 user_context=user_context,
             )
 
             await websocket.send_text(agent_response)
 
     except WebSocketDisconnect:
-        print(f"Client disconnected - Session: {session_id}")
-        _sessions.pop(id(websocket), None)
+        print(f"Client disconnected - Thread: {thread_id}")
     except Exception as e:
         print(f"An error occurred: {e}")
         await websocket.close(code=1011, reason="An internal error occurred.")
-        _sessions.pop(id(websocket), None)
