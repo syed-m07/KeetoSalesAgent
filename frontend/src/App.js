@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Login from './Login';
+import Register from './Register';
 import './App.css';
 
 const BROWSER_STREAM_URL = 'http://localhost:8001/stream';
 const TTS_URL = 'http://localhost:8000/speak';
 const WS_URL = 'ws://localhost:8000/ws/chat';
 
-function App() {
+// Main Chat Component
+function ChatApp({ user, onLogout }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [socket, setSocket] = useState(null);
@@ -16,18 +20,23 @@ function App() {
   const chatWindowRef = useRef(null);
   const audioRef = useRef(null);
 
-  // Initialize WebSocket connection
+  // Initialize WebSocket connection with token
   useEffect(() => {
-    const ws = new WebSocket(WS_URL);
+    const token = localStorage.getItem('token');
+    const wsUrl = token ? `${WS_URL}?token=${token}` : WS_URL;
+    const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
       console.log('✅ Connected to AI Agent');
       setSocket(ws);
       setIsConnected(true);
-      setMessages([{
-        sender: 'agent',
-        text: 'Hello! I\'m your AI Sales Agent. I can browse the web and help you with research. Try asking me to "go to google.com" or "what page am I on?"'
-      }]);
+
+      // Personalized greeting if user is logged in
+      const greeting = user
+        ? `Hello ${user.name}! I'm Ravi, your Product Consultant from Keeto. How can I help you today?`
+        : 'Hello! I\'m your AI Sales Agent. I can browse the web and help you with research.';
+
+      setMessages([{ sender: 'agent', text: greeting }]);
     };
 
     ws.onmessage = async (event) => {
@@ -58,7 +67,7 @@ function App() {
     return () => {
       if (ws.readyState === 1) ws.close();
     };
-  }, []);
+  }, [user]);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -76,7 +85,7 @@ function App() {
       const response = await fetch(TTS_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text.substring(0, 200) }) // Limit for faster TTS
+        body: JSON.stringify({ text: text.substring(0, 500) }) // Increased TTS limit
       });
 
       if (response.ok) {
@@ -122,11 +131,19 @@ function App() {
         <header className="header">
           <div className="logo">
             <span className="logo-icon">🤖</span>
-            <h1>Keeto Demo Agent</h1>
+            <h1>Keeto Product Consultant</h1>
           </div>
-          <div className={`status ${isConnected ? 'connected' : 'disconnected'}`}>
-            <span className="status-dot"></span>
-            {isConnected ? 'Connected' : 'Disconnected'}
+          <div className="user-info">
+            {user && <span className="user-name">👤 {user.name}</span>}
+            <div className={`status ${isConnected ? 'connected' : 'disconnected'}`}>
+              <span className="status-dot"></span>
+              {isConnected ? 'Connected' : 'Disconnected'}
+            </div>
+            {user && (
+              <button className="logout-btn" onClick={onLogout}>
+                Logout
+              </button>
+            )}
           </div>
         </header>
 
@@ -168,7 +185,7 @@ function App() {
               {messages.map((msg, index) => (
                 <div key={index} className={`message ${msg.sender}`}>
                   <div className="message-avatar">
-                    {msg.sender === 'user' ? '👤' : <img src="/avatar.png" alt="Agent" />}
+                    {msg.sender === 'user' ? '👤' : '🤖'}
                   </div>
                   <div className="message-content">
                     {msg.text}
@@ -177,7 +194,7 @@ function App() {
               ))}
               {isLoading && (
                 <div className="message agent">
-                  <div className="message-avatar"><img src="/avatar.png" alt="Agent" /></div>
+                  <div className="message-avatar">🤖</div>
                   <div className="message-content loading">
                     <span className="dot"></span>
                     <span className="dot"></span>
@@ -211,6 +228,86 @@ function App() {
       {/* Hidden audio element for TTS */}
       <audio ref={audioRef} onEnded={() => setIsSpeaking(false)} />
     </div>
+  );
+}
+
+// Protected Route Wrapper
+function ProtectedRoute({ user, children }) {
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+}
+
+// Main App with Routing
+function App() {
+  const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Check for existing session on mount
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const savedUser = localStorage.getItem('user');
+
+    if (token && savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (e) {
+        // Invalid stored data, clear it
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
+    }
+    setIsLoading(false);
+  }, []);
+
+  const handleLogin = (data) => {
+    localStorage.setItem('token', data.access_token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    setUser(data.user);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setUser(null);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="auth-container">
+        <div className="auth-box">
+          <h2>Loading...</h2>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Router>
+      <Routes>
+        <Route
+          path="/login"
+          element={
+            user ? <Navigate to="/" replace /> : <Login onLogin={handleLogin} />
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            user ? <Navigate to="/" replace /> : <Register onLogin={handleLogin} />
+          }
+        />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute user={user}>
+              <ChatApp user={user} onLogout={handleLogout} />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </Router>
   );
 }
 

@@ -134,13 +134,18 @@ def get_graph():
     return _graph
 
 
-def invoke_graph(user_input: str, session_id: str = None) -> str:
+def invoke_graph(
+    user_input: str,
+    session_id: str = None,
+    user_context: dict = None,
+) -> str:
     """
     Convenience function to invoke the graph with a user message.
     
     Args:
         user_input: The user's message.
         session_id: Optional session ID for persistence.
+        user_context: Optional user context dict with name, company, role, email.
     
     Returns:
         The agent's response as a string.
@@ -153,10 +158,10 @@ def invoke_graph(user_input: str, session_id: str = None) -> str:
     if not session_id:
         session_id = str(uuid.uuid4())
     
-    # Build initial state
+    # Build initial state with user context
     initial_state = {
         "messages": [HumanMessage(content=user_input)],
-        "user_context": None,
+        "user_context": user_context,
         "session_id": session_id,
         "current_url": None,
         "lead_score": 0,
@@ -183,3 +188,4 @@ def invoke_graph(user_input: str, session_id: str = None) -> str:
     except Exception as e:
         print(f"Graph invocation error: {e}")
         return f"Error: {e}"
+

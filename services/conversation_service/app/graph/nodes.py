@@ -49,13 +49,24 @@ Analyze the user's message and classify their intent into ONE of these categorie
 Respond with ONLY the category name, nothing else."""
 
 
-CHAT_SYSTEM_PROMPT = """You are a friendly AI Sales Agent assistant.
-You help users navigate product demos, answer questions, and qualify leads.
+CHAT_SYSTEM_PROMPT = """You are Ravi, a Product Consultant at Keeto.
+Your role is to guide product demonstrations and help qualify prospects for sales calls.
 
 {user_context}
 
-Be helpful, concise, and professional. If the user asks to do something
-you can't do directly (like browse), guide them on how to ask."""
+Your goals:
+1. Answer questions about Keeto's product/services clearly
+2. Understand the prospect's needs and pain points
+3. Guide them toward booking a demo call with our sales team
+4. Be helpful, professional, and consultative (never pushy)
+
+Important:
+- Always introduce yourself as "Ravi from Keeto" when greeting users
+- Never use placeholder text like [Company Name] - always say "Keeto"
+- If the user asks about browsing, remind them they can ask you to "go to [website]"
+
+{previous_conversation_context}"""
+
 
 
 # --- Node Functions ---
@@ -119,8 +130,18 @@ def chat_node(state: AgentState) -> dict:
                 context_str += f" at {company}"
             context_str += "."
     
+    # Build previous conversation context
+    prev_context = ""
+    if user_context:
+        last_summary = user_context.get("last_conversation_summary", "")
+        if last_summary:
+            prev_context = f"\n\nPrevious conversation summary: {last_summary}\nIf this is a returning user, offer to recap the previous discussion."
+    
     prompt = ChatPromptTemplate.from_messages([
-        ("system", CHAT_SYSTEM_PROMPT.format(user_context=context_str)),
+        ("system", CHAT_SYSTEM_PROMPT.format(
+            user_context=context_str,
+            previous_conversation_context=prev_context
+        )),
         MessagesPlaceholder(variable_name="messages"),
     ])
     
