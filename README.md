@@ -6,10 +6,11 @@ An AI-powered Sales Agent with browser automation, voice capabilities, and a pre
 
 | Feature | Status | Description |
 |---------|--------|-------------|
-| **LLM Integration** | ✅ | Groq (fast, cloud) or Ollama (local) |
+| **LLM Integration** | ✅ | **Gemini 2.0 Flash** (smart/fast) or **Llama 3.3 70B** (Groq) |
+| **Guided Demo Mode** | ✅ | Interactive YouTube pilot workflow (Search -> Select -> Pause) |
 | **Browser Automation** | ✅ | Navigate, type, click with Playwright |
 | **Live Browser Stream** | ✅ | MJPEG streaming at ~10 FPS |
-| **Text-to-Speech** | ✅ | gTTS for voice responses |
+| **Text-to-Speech** | ✅ | gTTS with markdown stripping for natural voice |
 | **Premium UI** | ✅ | Glassmorphism dark theme |
 | **Docker Orchestration** | ✅ | Full containerized stack |
 
@@ -18,7 +19,7 @@ An AI-powered Sales Agent with browser automation, voice capabilities, and a pre
 ```
 .
 ├── docker-compose.yml          # Orchestrates all services
-├── .env                        # Environment variables (GROQ_API_KEY)
+├── .env                        # Environment variables (GEMINI_API_KEY, GROQ_API_KEY)
 ├── frontend/                   # React frontend
 │   └── src/
 │       ├── App.js              # Main UI with chat + browser stream
@@ -30,22 +31,26 @@ An AI-powered Sales Agent with browser automation, voice capabilities, and a pre
     └── conversation_service/   # The "Brain" - LLM + Voice
         └── app/
             ├── main.py         # FastAPI + WebSocket
-            ├── agent.py        # ReAct agent with tools
-            ├── tools.py        # Browser tool definitions
-            └── voice.py        # TTS module
+            ├── graph/          # LangGraph Agent Logic
+            │   ├── builder.py  # Graph construction
+            │   ├── nodes.py    # Agent nodes (router, chat, demo)
+            │   └── demo_node.py # YouTube Demo workflow logic
+            ├── voice.py        # TTS module (supports markdown stripping)
+            └── tools.py        # Browser tool definitions
 ```
 
 ## 🛠️ Quick Start
 
 ### Prerequisites
 - Docker & Docker Compose
-- Groq API key (free at [console.groq.com](https://console.groq.com))
+- Groq API key (free at [console.groq.com](https://console.groq.com)) OR Gemini API Key (recommended)
 - Node.js 18+ (for frontend dev)
 
 ### 1. Setup Environment
 ```bash
 # Create .env file
-echo "GROQ_API_KEY=your-api-key-here" > .env
+echo "GROQ_API_KEY=your-groq-key" > .env
+echo "GEMINI_API_KEY=your-gemini-key" >> .env
 ```
 
 ### 2. Start Services
@@ -74,17 +79,17 @@ npm start
 | Command | Action |
 |---------|--------|
 | "hello" | Simple greeting (no tools) |
-| "go to youtube.com" | Navigate browser |
+| "show me a demo" | Starts the **Guided YouTube Demo** |
+| "go to youtube.com" | Navigate browser (manual mode) |
 | "type artificial intelligence" | Type in search field |
 | "click search" | Click search button |
-| "what page am I on?" | Get current page info |
 
 ## 🏗️ Architecture
 
 ```
 ┌─────────────┐     WebSocket      ┌─────────────────────┐
 │   Frontend  │◄──────────────────►│ conversation_service│
-│  (React)    │                    │   (LangChain/Groq)  │
+│  (React)    │                    │ (LangGraph/Gemini)  │
 └──────┬──────┘                    └──────────┬──────────┘
        │                                      │
        │ MJPEG Stream                         │ HTTP API
@@ -101,19 +106,20 @@ npm start
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `LLM_PROVIDER` | `groq` | `groq` (fast) or `ollama` (local) |
+| `LLM_PROVIDER` | `groq` | `groq` (free), `gemini` (smart), or `ollama` (local) |
+| `GEMINI_API_KEY` | - | Google Gemini API Key |
 | `GROQ_API_KEY` | - | Your Groq API key |
-| `GROQ_MODEL` | `llama-3.1-8b-instant` | Groq model to use |
+| `GROQ_MODEL` | `llama-3.3-70b-versatile` | Groq model to use |
 | `OLLAMA_HOST` | `host.docker.internal:11434` | Ollama server URL |
 | `OLLAMA_MODEL` | `llama3.2:3b` | Ollama model to use |
 
 ### Switching LLM Providers
 
 ```yaml
-# In docker-compose.yml, change:
-LLM_PROVIDER: groq   # Fast cloud-based (~1-2s)
+# In docker-compose.yml:
+LLM_PROVIDER: gemini # Recommended for reasoning
 # OR
-LLM_PROVIDER: ollama # Local, slower on CPU
+LLM_PROVIDER: groq   # Fast, free 70B model
 ```
 
 ## 📡 API Endpoints
@@ -165,7 +171,9 @@ curl -X POST http://localhost:8000/speak \
 - [x] **Phase 1**: Core Infrastructure (Docker, Postgres, Ollama)
 - [x] **Phase 2**: Browser Automation (Playwright, ReAct Agent)
 - [x] **Phase 3**: Premium Frontend + Voice (TTS, MJPEG, Glassmorphism)
-- [ ] **Phase 4**: Enrichment, CRM, Observability
+- [x] **Phase 4**: Agent Identity & Persistence (Postgres Checkpoints)
+- [x] **Phase 5**: YouTube Demo Pilot (Gemini/Groq, Demo Workflow)
+- [ ] **Phase 6**: Enrichment, CRM, Observability
 
 ## 📝 License
 
