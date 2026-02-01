@@ -42,11 +42,14 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # LLM Provider: "groq" (fast, cloud) or "ollama" (local)
+      # LLM Provider: "gemini" (recommended), "groq" (fast), or "ollama" (local)
+      # Using Groq for now to avoid Gemini free tier quota limits
       LLM_PROVIDER: groq
+      # Gemini settings (used when LLM_PROVIDER=gemini)
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
       # Groq settings (used when LLM_PROVIDER=groq)
       GROQ_API_KEY: ${GROQ_API_KEY}
-      GROQ_MODEL: llama-3.1-8b-instant
+      GROQ_MODEL: llama-3.3-70b-versatile
       # Ollama settings (used when LLM_PROVIDER=ollama)
       OLLAMA_HOST: http://host.docker.internal:11434
       OLLAMA_MODEL: llama3.2:3b

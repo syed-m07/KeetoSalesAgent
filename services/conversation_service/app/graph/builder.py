@@ -10,6 +10,7 @@ from langgraph.checkpoint.postgres import PostgresSaver
 from .state import AgentState
 from .nodes import router_node, chat_node, route_by_intent
 from .tool_nodes import navigate_node, enrich_node, crm_node
+from .demo_node import demo_node
 
 
 def create_sales_agent_graph(checkpointer=None):
@@ -31,6 +32,7 @@ def create_sales_agent_graph(checkpointer=None):
     graph.add_node("navigate", navigate_node)
     graph.add_node("enrich", enrich_node)
     graph.add_node("crm", crm_node)
+    graph.add_node("demo_workflow", demo_node)  # Guided demo workflow
     
     # --- Add Edges ---
     # Start -> Router (always route first)
@@ -45,6 +47,7 @@ def create_sales_agent_graph(checkpointer=None):
             "navigate": "navigate",
             "enrich": "enrich",
             "crm": "crm",
+            "demo": "demo_workflow",
         }
     )
     
@@ -53,6 +56,7 @@ def create_sales_agent_graph(checkpointer=None):
     graph.add_edge("navigate", END)
     graph.add_edge("enrich", END)
     graph.add_edge("crm", END)
+    graph.add_edge("demo_workflow", END)  # Demo steps are single-turn too
     
     # Compile with optional checkpointer
     if checkpointer:
@@ -158,14 +162,14 @@ def invoke_graph(
     if not thread_id:
         thread_id = str(uuid.uuid4())
     
-    # Build initial state with user context
+    # Build input state - only include messages and context
+    # Other fields (demo, lead_score, etc.) will be loaded from checkpoint
     initial_state = {
         "messages": [HumanMessage(content=user_input)],
         "user_context": user_context,
-        "session_id": thread_id,  # Keep state field name for now
-        "current_url": None,
-        "lead_score": 0,
-        "next_action": None,
+        "session_id": thread_id,
+        # Don't set demo, current_url, lead_score, next_action here
+        # They'll be loaded from checkpoint or use defaults
     }
     
     # Config for checkpointer - use thread_id for persistence

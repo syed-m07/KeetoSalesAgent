@@ -6,6 +6,8 @@ from typing import Annotated, TypedDict, Optional, List
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
 
+from .demo_state import DemoState
+
 
 class UserContext(TypedDict, total=False):
     """User context loaded from database."""
@@ -27,6 +29,7 @@ class AgentState(TypedDict):
         lead_score: Qualification score (0-100) for the current lead.
         next_action: Hint for what the agent should do next.
         session_id: Unique identifier for this conversation session.
+        demo: State for guided demo workflow.
     """
     # Core conversation state - uses LangGraph's message reducer
     messages: Annotated[List[BaseMessage], add_messages]
@@ -42,4 +45,7 @@ class AgentState(TypedDict):
     lead_score: int  # 0-100, updated by enrichment/analysis
     
     # Routing hints
-    next_action: Optional[str]  # "navigate", "enrich", "crm", "chat", "handoff"
+    next_action: Optional[str]  # "navigate", "enrich", "crm", "chat", "demo"
+    
+    # Demo workflow state
+    demo: Optional[DemoState]
