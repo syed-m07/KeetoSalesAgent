@@ -133,7 +133,7 @@ function ChatApp({ user, onLogout }) {
             <h1>YouTube Product Consultant</h1>
           </div>
           <div className="user-info">
-            {user && <span className="user-name">👤 {user.name}</span>}
+            {user && <span className="user-name"><img src="/user-avatar.jpg" alt={user.name} style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover', verticalAlign: 'middle', marginRight: '6px' }} />{user.name}</span>}
             <div className={`status ${isConnected ? 'connected' : 'disconnected'}`}>
               <span className="status-dot"></span>
               {isConnected ? 'Connected' : 'Disconnected'}
@@ -186,7 +186,7 @@ function ChatApp({ user, onLogout }) {
               {messages.map((msg, index) => (
                 <div key={index} className={`message ${msg.sender}`}>
                   <div className="message-avatar">
-                    {msg.sender === 'user' ? '👤' : <img src="/avatar.jpg" alt="Ravi" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />}
+                    {msg.sender === 'user' ? <img src="/user-avatar.jpg" alt="You" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : <img src="/avatar.jpg" alt="Ravi" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />}
                   </div>
                   <div className="message-content">
                     <ReactMarkdown>{msg.text}</ReactMarkdown>

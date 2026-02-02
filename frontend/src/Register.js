@@ -54,7 +54,7 @@ const Register = ({ onLogin }) => {
         <div className="auth-container">
             <div className="auth-box">
                 <h2>Create Account</h2>
-                <p className="auth-subtitle">Get started with Keeto Product Consultant</p>
+                <p className="auth-subtitle">Get started with YouTube Product Consultant</p>
 
                 {error && <div className="auth-error">{error}</div>}
 

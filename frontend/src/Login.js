@@ -42,7 +42,7 @@ const Login = ({ onLogin }) => {
         <div className="auth-container">
             <div className="auth-box">
                 <h2>Welcome Back</h2>
-                <p className="auth-subtitle">Sign in to continue to Keeto Product Consultant</p>
+                <p className="auth-subtitle">Sign in to continue to YouTube Product Consultant</p>
 
                 {error && <div className="auth-error">{error}</div>}
 
