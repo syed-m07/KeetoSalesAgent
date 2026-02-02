@@ -2,7 +2,7 @@
 Demo State Definition for Guided Demonstrations.
 Tracks the current step and status of a product demo workflow.
 """
-from typing import TypedDict, Optional
+from typing import TypedDict
 
 
 class DemoState(TypedDict, total=False):
