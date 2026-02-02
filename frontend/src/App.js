@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
 import Login from './Login';
 import Register from './Register';
 import './App.css';
@@ -31,10 +32,10 @@ function ChatApp({ user, onLogout }) {
       setSocket(ws);
       setIsConnected(true);
 
-      // Personalized greeting if user is logged in
+      // Personalized greeting
       const greeting = user
-        ? `Hello ${user.name}! I'm Ravi, your Product Consultant from Keeto. How can I help you today?`
-        : 'Hello! I\'m your AI Sales Agent. I can browse the web and help you with research.';
+        ? `Hello ${user.name}! I'm Ravi, your YouTube Product Consultant. How can I help you today?`
+        : 'Hello! I\'m your YouTube Product Consultant. I can demonstrate YouTube features for you.';
 
       setMessages([{ sender: 'agent', text: greeting }]);
     };
@@ -45,7 +46,7 @@ function ChatApp({ user, onLogout }) {
       setMessages(prev => [...prev, { sender: 'agent', text: agentResponse }]);
 
       // Activate browser stream if agent navigated
-      if (agentResponse.toLowerCase().includes('navigated') || agentResponse.toLowerCase().includes('go to')) {
+      if (agentResponse.toLowerCase().includes('navigated') || agentResponse.toLowerCase().includes('go to') || agentResponse.toLowerCase().includes('youtube')) {
         setIsBrowserActive(true);
       }
 
@@ -85,7 +86,7 @@ function ChatApp({ user, onLogout }) {
       const response = await fetch(TTS_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text.substring(0, 500) }) // Increased TTS limit
+        body: JSON.stringify({ text: text.substring(0, 500) })
       });
 
       if (response.ok) {
@@ -98,8 +99,6 @@ function ChatApp({ user, onLogout }) {
       }
     } catch (error) {
       console.error('TTS error:', error);
-    } finally {
-      setIsSpeaking(false);
     }
   }, []);
 
@@ -130,8 +129,8 @@ function ChatApp({ user, onLogout }) {
         {/* Header */}
         <header className="header">
           <div className="logo">
-            <span className="logo-icon">🤖</span>
-            <h1>Keeto Product Consultant</h1>
+            <img src="/avatar.jpg" alt="Ravi" className="logo-icon" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
+            <h1>YouTube Product Consultant</h1>
           </div>
           <div className="user-info">
             {user && <span className="user-name">👤 {user.name}</span>}
@@ -154,7 +153,7 @@ function ChatApp({ user, onLogout }) {
             <div className="panel-header">
               <span>🌐 Browser View</span>
             </div>
-            <div className="browser-frame">
+            <div className="browser-frame" style={{ position: 'relative' }}>
               {isBrowserActive ? (
                 <img
                   src={BROWSER_STREAM_URL}
@@ -163,12 +162,14 @@ function ChatApp({ user, onLogout }) {
                   onError={(e) => e.target.style.display = 'none'}
                 />
               ) : (
-                <div className="browser-placeholder">
-                  <div className="placeholder-content">
-                    <span className="placeholder-icon">🖥️</span>
-                    <h3>Ready to Browse</h3>
-                    <p>Ask me to navigate to a website to see the live view.</p>
-                  </div>
+                <div className="profile-placeholder">
+                  <img
+                    src="/avatar.jpg"
+                    alt="Ravi"
+                    className={`profile-avatar ${isSpeaking ? 'speaking' : ''}`}
+                  />
+                  <span className="profile-name">Ravi</span>
+                  <span className="powered-by">Powered by Button AI</span>
                 </div>
               )}
             </div>
@@ -185,16 +186,16 @@ function ChatApp({ user, onLogout }) {
               {messages.map((msg, index) => (
                 <div key={index} className={`message ${msg.sender}`}>
                   <div className="message-avatar">
-                    {msg.sender === 'user' ? '👤' : '🤖'}
+                    {msg.sender === 'user' ? '👤' : <img src="/avatar.jpg" alt="Ravi" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />}
                   </div>
                   <div className="message-content">
-                    {msg.text}
+                    <ReactMarkdown>{msg.text}</ReactMarkdown>
                   </div>
                 </div>
               ))}
               {isLoading && (
                 <div className="message agent">
-                  <div className="message-avatar">🤖</div>
+                  <div className="message-avatar"><img src="/avatar.jpg" alt="Ravi" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /></div>
                   <div className="message-content loading">
                     <span className="dot"></span>
                     <span className="dot"></span>
