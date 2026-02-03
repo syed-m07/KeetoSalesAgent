@@ -66,13 +66,21 @@ llm = get_llm()
 
 
 # --- System Prompts ---
-ROUTER_SYSTEM_PROMPT = """You are an intent classifier for a Sales AI Agent.
+ROUTER_SYSTEM_PROMPT = """You are an intent classifier for a Sales AI Agent named Ravi.
 
 Analyze the user's message and classify their intent into ONE of these categories:
-- "navigate": User wants to go somewhere on web, click something, or interact with a page
+- "start_demo": User explicitly wants to START or RESTART a product demonstration (e.g., "show me the demo", "can we do the demo again?", "let's do a walkthrough")
+- "navigate": User wants to go somewhere on web, click something, or interact with a page (NOT demo-related)
 - "enrich": User wants information about a company, person, or wants research done
 - "crm": User wants to save, list, or manage leads/contacts
-- "chat": General conversation, greetings, questions about capabilities
+- "chat": General conversation, greetings, questions about capabilities, or questions ABOUT a demo without wanting to start one
+
+IMPORTANT DISTINCTIONS:
+- "How many times have we done the demo?" → "chat" (asking about demo, not starting one)
+- "Can you email me the demo summary?" → "chat" (asking about demo, not starting one)
+- "Show me the demo" → "start_demo" (explicitly requesting to start)
+- "What happens in the demo?" → "chat" (asking info, not starting)
+- "Let's do the demo" → "start_demo" (explicitly requesting to start)
 
 Respond with ONLY the category name, nothing else."""
 
@@ -126,14 +134,19 @@ def router_node(state: AgentState) -> dict:
     Classifies user intent and sets next_action.
     This is the entry point after user input.
     
+    Uses LLM for intelligent intent classification including:
+    - start_demo: User wants to START a demo
+    - chat: General conversation (including questions ABOUT demos)
+    - navigate/enrich/crm: Other actions
+    
     Special handling:
-    - If demo is active, continue to demo node
-    - If user asks for demo, start demo mode
+    - If demo is active and user confirms (yes/next), continue demo
+    - If demo is active and user wants to exit (stop/no), exit demo
     """
     messages = state.get("messages", [])
     demo = state.get("demo", {})
     
-    # If demo is active, always route to demo node
+    # If demo is active, route to demo node for continuation/exit handling
     if demo and demo.get("is_active"):
         print("🎬 Demo active - routing to demo_node")
         return {"next_action": "demo"}
@@ -145,20 +158,7 @@ def router_node(state: AgentState) -> dict:
     if not isinstance(last_message, HumanMessage):
         return {"next_action": "chat"}
     
-    user_text = last_message.content.lower()
-    
-    # Quick pattern matching for demo requests (avoid LLM call)
-    # If user explicitly asks for demo, always restart from beginning
-    demo_triggers = ["demo", "show me", "demonstrate", "walkthrough", "tutorial", "guide me"]
-    if any(trigger in user_text for trigger in demo_triggers):
-        print("🎬 Demo request detected - resetting and routing to demo_node")
-        # Reset demo state to force restart from step 0
-        return {
-            "next_action": "demo",
-            "demo": None  # Reset so demo_node initializes fresh
-        }
-    
-    # Create classification prompt
+    # Use LLM to classify intent (including distinguishing start_demo vs chat about demos)
     prompt = ChatPromptTemplate.from_messages([
         ("system", ROUTER_SYSTEM_PROMPT),
         ("human", "{input}")
@@ -170,7 +170,15 @@ def router_node(state: AgentState) -> dict:
         result = chain.invoke({"input": last_message.content})
         intent = result.content.strip().lower()
         
-        # Validate intent
+        # Map start_demo to demo action
+        if intent == "start_demo":
+            print("🎬 Demo start requested - routing to demo_node")
+            return {
+                "next_action": "demo",
+                "demo": None  # Reset so demo_node initializes fresh
+            }
+        
+        # Validate other intents
         valid_intents = ["navigate", "enrich", "crm", "chat"]
         if intent not in valid_intents:
             intent = "chat"
