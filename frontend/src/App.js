@@ -18,8 +18,38 @@ function ChatApp({ user, onLogout }) {
   const [isLoading, setIsLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isBrowserActive, setIsBrowserActive] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const chatWindowRef = useRef(null);
   const audioRef = useRef(null);
+  const recognitionRef = useRef(null);
+
+  // Initialize Web Speech API
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        setInput(prev => prev + transcript);
+        setIsListening(false);
+      };
+
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+    }
+  }, []);
 
   // Initialize WebSocket connection with token
   useEffect(() => {
@@ -113,9 +143,25 @@ function ChatApp({ user, onLogout }) {
   };
 
   const handleKeyPress = (event) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
+    if (event.key === 'Enter' && !event.shiftkey) {
       event.preventDefault();
       sendMessage();
+    }
+  };
+
+  // Toggle voice recording
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      alert('Speech recognition is not supported in your browser. Please use Chrome.');
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      recognitionRef.current.start();
+      setIsListening(true);
     }
   };
 
@@ -155,12 +201,20 @@ function ChatApp({ user, onLogout }) {
             </div>
             <div className="browser-frame" style={{ position: 'relative' }}>
               {isBrowserActive ? (
-                <img
-                  src={BROWSER_STREAM_URL}
-                  alt="Live Browser"
-                  className="browser-stream"
-                  onError={(e) => e.target.style.display = 'none'}
-                />
+                <>
+                  <img
+                    src={BROWSER_STREAM_URL}
+                    alt="Live Browser"
+                    className="browser-stream"
+                    onError={(e) => e.target.style.display = 'none'}
+                  />
+                  {/* Floating Ravi Avatar (Google Meet style) */}
+                  <div className={`floating-avatar ${isSpeaking ? 'speaking' : ''}`}>
+                    <img src="/avatar.jpg" alt="Ravi" />
+                    <span className="floating-name">Ravi</span>
+                    {isSpeaking && <span className="audio-wave">🔊</span>}
+                  </div>
+                </>
               ) : (
                 <div className="profile-placeholder">
                   <img
@@ -206,12 +260,20 @@ function ChatApp({ user, onLogout }) {
             </div>
 
             <div className="chat-input-area">
+              <button
+                onClick={toggleListening}
+                className={`mic-btn ${isListening ? 'listening' : ''}`}
+                disabled={!isConnected || isLoading}
+                title={isListening ? 'Click to stop' : 'Click to speak'}
+              >
+                {isListening ? '🔴' : '🎤'}
+              </button>
               <input
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder={isConnected ? "Ask me anything..." : "Connecting..."}
+                placeholder={isListening ? "Listening..." : (isConnected ? "Ask me anything..." : "Connecting...")}
                 disabled={!isConnected || isLoading}
               />
               <button

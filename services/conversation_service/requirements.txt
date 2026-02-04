@@ -29,6 +29,7 @@ pytz
 
 # Text-to-speech
 gTTS==2.5.4
+edge-tts>=6.1.0
 
 # Auth & Security
 python-jose[cryptography]>=3.3.0

@@ -1,14 +1,31 @@
 """
 Voice Module - Text-to-Speech utilities.
-Uses gTTS (Google Text-to-Speech) for reliable TTS in containers.
+Uses Edge TTS (Microsoft Neural TTS) for natural-sounding voices.
+Falls back to gTTS if Edge TTS fails.
 """
 import re
+import asyncio
 from io import BytesIO
+from typing import Optional
 
+import edge_tts
 from gtts import gTTS
 
 
-# Available languages
+# Default voice for "Ravi" - Indian English Male (natural neural voice)
+DEFAULT_VOICE = "en-IN-PrabhatNeural"
+
+# Available Edge TTS voices (popular selections)
+EDGE_VOICES = {
+    "ravi": "en-IN-PrabhatNeural",      # Indian English Male (default)
+    "priya": "en-IN-NeerjaNeural",      # Indian English Female
+    "guy": "en-US-GuyNeural",           # US English Male
+    "aria": "en-US-AriaNeural",         # US English Female
+    "ryan": "en-GB-RyanNeural",         # British English Male
+    "sonia": "en-GB-SoniaNeural",       # British English Female
+}
+
+# Legacy language support (for backward compatibility)
 SUPPORTED_LANGS = ["en", "es", "fr", "de", "it", "pt", "hi", "ar", "zh-CN", "ja", "ko"]
 
 
@@ -56,36 +73,38 @@ def strip_markdown(text: str) -> str:
     return text.strip()
 
 
-def text_to_speech_sync(text: str, lang: str = "en") -> bytes:
+async def text_to_speech_edge(text: str, voice: str = DEFAULT_VOICE) -> bytes:
     """
-    Convert text to speech audio bytes (MP3 format).
-    Synchronous version for simplicity.
+    Convert text to speech using Edge TTS (Microsoft Neural voices).
     
     Args:
         text: The text to convert to speech.
-        lang: Language code (default: en).
+        voice: Edge TTS voice name (default: en-IN-PrabhatNeural).
     
     Returns:
         Audio data as MP3 bytes.
     """
-    # Strip markdown for clean TTS
     clean_text = strip_markdown(text)
     
-    # Create TTS object
-    tts = gTTS(text=clean_text, lang=lang, slow=False)
+    if not clean_text:
+        return b""
     
-    # Write to BytesIO buffer
+    # Create Edge TTS communicate object
+    communicate = edge_tts.Communicate(clean_text, voice)
+    
+    # Collect audio chunks
     audio_buffer = BytesIO()
-    tts.write_to_fp(audio_buffer)
-    audio_buffer.seek(0)
+    async for chunk in communicate.stream():
+        if chunk["type"] == "audio":
+            audio_buffer.write(chunk["data"])
     
+    audio_buffer.seek(0)
     return audio_buffer.read()
 
 
-async def text_to_speech(text: str, lang: str = "en") -> bytes:
+def text_to_speech_gtts(text: str, lang: str = "en") -> bytes:
     """
-    Async wrapper for text_to_speech.
-    gTTS is synchronous, so we just call the sync version.
+    Fallback: Convert text to speech using gTTS (Google TTS).
     
     Args:
         text: The text to convert to speech.
@@ -94,17 +113,89 @@ async def text_to_speech(text: str, lang: str = "en") -> bytes:
     Returns:
         Audio data as MP3 bytes.
     """
-    return text_to_speech_sync(text, lang)
+    clean_text = strip_markdown(text)
+    
+    if not clean_text:
+        return b""
+    
+    tts = gTTS(text=clean_text, lang=lang, slow=False)
+    audio_buffer = BytesIO()
+    tts.write_to_fp(audio_buffer)
+    audio_buffer.seek(0)
+    return audio_buffer.read()
+
+
+def text_to_speech_sync(text: str, lang: str = "en", voice: Optional[str] = None) -> bytes:
+    """
+    Synchronous wrapper for TTS. Uses Edge TTS by default, falls back to gTTS.
+    
+    Args:
+        text: The text to convert to speech.
+        lang: Language code (for gTTS fallback).
+        voice: Edge TTS voice name (optional, uses Ravi's voice by default).
+    
+    Returns:
+        Audio data as MP3 bytes.
+    """
+    # Use Edge TTS with default Ravi voice
+    selected_voice = voice or EDGE_VOICES.get("ravi", DEFAULT_VOICE)
+    
+    try:
+        # Run async Edge TTS in sync context
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            audio = loop.run_until_complete(text_to_speech_edge(text, selected_voice))
+            if audio:
+                return audio
+        finally:
+            loop.close()
+    except Exception as e:
+        print(f"⚠️ Edge TTS failed: {e}, falling back to gTTS")
+    
+    # Fallback to gTTS
+    return text_to_speech_gtts(text, lang)
+
+
+async def text_to_speech(text: str, lang: str = "en", voice: Optional[str] = None) -> bytes:
+    """
+    Async TTS. Uses Edge TTS by default, falls back to gTTS.
+    
+    Args:
+        text: The text to convert to speech.
+        lang: Language code (for gTTS fallback).
+        voice: Edge TTS voice name (optional, uses Ravi's voice by default).
+    
+    Returns:
+        Audio data as MP3 bytes.
+    """
+    selected_voice = voice or EDGE_VOICES.get("ravi", DEFAULT_VOICE)
+    
+    try:
+        audio = await text_to_speech_edge(text, selected_voice)
+        if audio:
+            return audio
+    except Exception as e:
+        print(f"⚠️ Edge TTS failed: {e}, falling back to gTTS")
+    
+    # Fallback to gTTS (sync)
+    return text_to_speech_gtts(text, lang)
 
 
 def get_available_voices() -> list[dict]:
     """
-    Get list of available TTS languages/voices.
+    Get list of available TTS voices.
     
     Returns:
         List of voice metadata dictionaries.
     """
-    return [
-        {"id": lang, "name": f"Google TTS ({lang})", "locale": lang}
-        for lang in SUPPORTED_LANGS
+    voices = [
+        {"id": key, "name": value, "locale": value.split("-")[0] + "-" + value.split("-")[1], "quality": "neural"}
+        for key, value in EDGE_VOICES.items()
     ]
+    # Add legacy gTTS voices
+    voices.extend([
+        {"id": lang, "name": f"Google TTS ({lang})", "locale": lang, "quality": "standard"}
+        for lang in SUPPORTED_LANGS
+    ])
+    return voices
