@@ -29,13 +29,37 @@ function ChatApp({ user, onLogout }) {
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
       recognition.continuous = false;
-      recognition.interimResults = false;
+      recognition.interimResults = true;  // Show text as you speak
       recognition.lang = 'en-US';
 
       recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        setInput(prev => prev + transcript);
-        setIsListening(false);
+        let interimTranscript = '';
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+
+        // Update input with interim (gray preview) or final text
+        if (finalTranscript) {
+          setInput(finalTranscript);
+          // Auto-send after a short delay (let user see what was captured)
+          setTimeout(() => {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+              setMessages(prev => [...prev, { sender: 'user', text: finalTranscript }]);
+              socket.send(finalTranscript);
+              setInput('');
+              setIsLoading(true);
+            }
+          }, 300);
+        } else {
+          setInput(interimTranscript);  // Show live preview
+        }
       };
 
       recognition.onerror = (event) => {
@@ -49,7 +73,7 @@ function ChatApp({ user, onLogout }) {
 
       recognitionRef.current = recognition;
     }
-  }, []);
+  }, [socket]);  // Add socket to dependencies for auto-send
 
   // Initialize WebSocket connection with token
   useEffect(() => {
@@ -158,8 +182,10 @@ function ChatApp({ user, onLogout }) {
 
     if (isListening) {
       recognitionRef.current.stop();
-      setIsListening(false);
+      // Don't set isListening=false here - let onend event handle it
+      // This ensures the last audio chunk is processed before stopping
     } else {
+      setInput('');  // Clear input before starting
       recognitionRef.current.start();
       setIsListening(true);
     }
