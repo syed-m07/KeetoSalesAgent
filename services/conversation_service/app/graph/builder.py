@@ -162,21 +162,38 @@ def invoke_graph(
     if not thread_id:
         thread_id = str(uuid.uuid4())
     
-    # Build input state - only include messages and context
-    # Other fields (demo, lead_score, etc.) will be loaded from checkpoint
-    initial_state = {
-        "messages": [HumanMessage(content=user_input)],
-        "user_context": user_context,
-        "session_id": thread_id,
-        # Don't set demo, current_url, lead_score, next_action here
-        # They'll be loaded from checkpoint or use defaults
-    }
-    
     # Config for checkpointer - use thread_id for persistence
     config = {"configurable": {"thread_id": thread_id}}
     
     try:
-        # Invoke the graph
+        # Try to load existing state from checkpoint
+        existing_state = None
+        try:
+            state_snapshot = graph.get_state(config)
+            if state_snapshot and state_snapshot.values:
+                existing_state = state_snapshot.values
+                print(f"📚 Loaded {len(existing_state.get('messages', []))} messages from checkpoint")
+        except Exception as e:
+            print(f"📝 No existing checkpoint (new session): {e}")
+        
+        # Build input state
+        if existing_state:
+            # Append new message to existing messages (checkpoint will merge via add_messages)
+            # We only need to pass the NEW message - the reducer will append it
+            initial_state = {
+                "messages": [HumanMessage(content=user_input)],
+                "user_context": user_context or existing_state.get("user_context"),
+                "session_id": thread_id,
+            }
+        else:
+            # Fresh session - start with just the new message
+            initial_state = {
+                "messages": [HumanMessage(content=user_input)],
+                "user_context": user_context,
+                "session_id": thread_id,
+            }
+        
+        # Invoke the graph - the checkpointer will handle merging
         result = graph.invoke(initial_state, config=config)
         
         # Extract response from messages
@@ -191,5 +208,7 @@ def invoke_graph(
     
     except Exception as e:
         print(f"Graph invocation error: {e}")
+        import traceback
+        traceback.print_exc()
         return f"Error: {e}"
 

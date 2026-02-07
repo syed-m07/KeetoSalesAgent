@@ -50,11 +50,33 @@ Instrumentator().instrument(app).expose(app)
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database tables on startup."""
+    """Initialize database and verify critical services."""
     try:
+        # 1. Init DB
         Base.metadata.create_all(bind=engine)
+        print("✅ Database initialized")
+        
+        # 2. Check Edge TTS availability
+        import subprocess
+        try:
+            # edge-tts --list-voices is a valid command to check if it works
+            # We just check return code, output might be long so we don't print it all
+            result = subprocess.run(["edge-tts", "--list-voices"], capture_output=True, text=True)
+            if result.returncode == 0:
+                print(f"✅ Edge TTS available (found {len(result.stdout.splitlines())} voices)")
+            else:
+                print(f"⚠️ Edge TTS CLI found but returned error: {result.stderr[:200]}...")
+        except FileNotFoundError:
+            print("❌ Edge TTS CLI NOT FOUND in PATH! Voice will fallout to gTTS (robotic).")
+        except Exception as e:
+            print(f"⚠️ Edge TTS check failed: {e}")
+            
+        # 3. Log default voice
+        from .voice import DEFAULT_VOICE
+        print(f"🎤 Default Voice Configured: {DEFAULT_VOICE}")
+        
     except Exception as e:
-        print(f"⚠️ Database init skipped (OK for tests): {e}")
+        print(f"⚠️ Startup warning: {e}")
 
 
 # =============================================================================
@@ -188,39 +210,50 @@ _sessions = {}
 async def websocket_endpoint(
     websocket: WebSocket,
     token: Optional[str] = None,
+    guest_id: Optional[str] = None,
 ):
     """
     WebSocket endpoint for chat conversations using LangGraph.
     
     Optionally accepts 'token' query parameter for authenticated sessions.
-    Example: ws://localhost:8000/ws/chat?token=eyJhbGc...
+    Optionally accepts 'guest_id' for persistent guest sessions.
+    Example: ws://localhost:8000/ws/chat?token=eyJhbGc...&guest_id=...
     """
     await websocket.accept()
 
     # Determine thread_id based on authentication
     # For authenticated users, use a constant user-based ID for persistent memory
-    # For guests, use a random UUID (memory will not persist across sessions)
+    # For guests, use provided guest_id or generate a new random UUID
     thread_id = None
     user_context = None
     
     if token:
-        user_id = verify_token(token)
-        if user_id:
-            from .database import SessionLocal
-            db = SessionLocal()
-            try:
-                user = db.query(User).filter(User.id == user_id).first()
-                if user:
-                    user_context = user.to_context_dict()
-                    thread_id = f"user_{user.id}"  # Persistent thread ID
-                    print(f"🔐 Authenticated user: {user.name} ({user.email}) | Thread: {thread_id}")
-            finally:
-                db.close()
+        try:
+            user_id = verify_token(token)
+            if user_id:
+                from .database import SessionLocal
+                db = SessionLocal()
+                try:
+                    user = db.query(User).filter(User.id == user_id).first()
+                    if user:
+                        user_context = user.to_context_dict()
+                        thread_id = f"user_{user.id}"  # Persistent thread ID
+                        print(f"🔐 Authenticated user: {user.name} ({user.email}) | Thread: {thread_id}")
+                finally:
+                    db.close()
+        except Exception as e:
+            print(f"⚠️ Token verification failed: {e}")
     
-    # Fallback to random session for guests
+    # Fallback to guest session
     if not thread_id:
-        thread_id = str(uuid.uuid4())
-        print(f"👤 Guest session - Thread: {thread_id}")
+        if guest_id:
+            # Use provided guest_id for persistence
+            thread_id = guest_id
+            print(f"👤 Guest session (Persisted) - Thread: {thread_id}")
+        else:
+            # Generate new ID if none provided
+            thread_id = str(uuid.uuid4())
+            print(f"👤 New Guest session - Thread: {thread_id}")
 
     greeting = f"Thread: {thread_id}"
     if user_context:

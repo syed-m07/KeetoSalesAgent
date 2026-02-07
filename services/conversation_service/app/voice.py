@@ -127,7 +127,7 @@ def text_to_speech_gtts(text: str, lang: str = "en") -> bytes:
 
 def text_to_speech_sync(text: str, lang: str = "en", voice: Optional[str] = None) -> bytes:
     """
-    Synchronous wrapper for TTS. Uses Edge TTS by default, falls back to gTTS.
+    Synchronous wrapper for TTS. Uses Edge TTS via CLI subprocess for stability, falls back to gTTS.
     
     Args:
         text: The text to convert to speech.
@@ -139,19 +139,38 @@ def text_to_speech_sync(text: str, lang: str = "en", voice: Optional[str] = None
     """
     # Use Edge TTS with default Ravi voice
     selected_voice = voice or EDGE_VOICES.get("ravi", DEFAULT_VOICE)
+    clean_text = strip_markdown(text)
     
     try:
-        # Run async Edge TTS in sync context
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            audio = loop.run_until_complete(text_to_speech_edge(text, selected_voice))
-            if audio:
-                return audio
-        finally:
-            loop.close()
+        # Use subprocess to call edge-tts CLI directly
+        # This avoids asyncio loop nesting issues in sync contexts
+        import subprocess
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as temp_audio:
+            temp_path = temp_audio.name
+            
+        # Run edge-tts CLI command
+        # edge-tts --text "Hello" --write-media /tmp/output.mp3 --voice en-IN-PrabhatNeural
+        subprocess.run(
+            ["edge-tts", "--text", clean_text, "--write-media", temp_path, "--voice", selected_voice],
+            check=True,
+            capture_output=True
+        )
+        
+        # Read the generated file
+        with open(temp_path, "rb") as f:
+            audio_data = f.read()
+            
+        # Cleanup
+        os.unlink(temp_path)
+        
+        if audio_data:
+            return audio_data
+            
     except Exception as e:
-        print(f"⚠️ Edge TTS failed: {e}, falling back to gTTS")
+        print(f"⚠️ Edge TTS CLI failed: {e}, falling back to gTTS")
     
     # Fallback to gTTS
     return text_to_speech_gtts(text, lang)
@@ -159,15 +178,7 @@ def text_to_speech_sync(text: str, lang: str = "en", voice: Optional[str] = None
 
 async def text_to_speech(text: str, lang: str = "en", voice: Optional[str] = None) -> bytes:
     """
-    Async TTS. Uses Edge TTS by default, falls back to gTTS.
-    
-    Args:
-        text: The text to convert to speech.
-        lang: Language code (for gTTS fallback).
-        voice: Edge TTS voice name (optional, uses Ravi's voice by default).
-    
-    Returns:
-        Audio data as MP3 bytes.
+    Async TTS. Uses Edge TTS library directly.
     """
     selected_voice = voice or EDGE_VOICES.get("ravi", DEFAULT_VOICE)
     

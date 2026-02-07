@@ -78,7 +78,30 @@ function ChatApp({ user, onLogout }) {
   // Initialize WebSocket connection with token
   useEffect(() => {
     const token = localStorage.getItem('token');
-    const wsUrl = token ? `${WS_URL}?token=${token}` : WS_URL;
+
+    // Get or create persistent guest ID
+    let guestId = localStorage.getItem('guest_id');
+    if (!guestId) {
+      guestId = 'guest_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+      localStorage.setItem('guest_id', guestId);
+    }
+
+    // Build WebSocket URL with explicit guest_id for persistence
+    // If token exists, backend prefers token logic, but we send guest_id anyway as fallback
+    let wsUrl = WS_URL;
+    const params = new URLSearchParams();
+
+    if (token) {
+      params.append('token', token);
+    }
+    if (guestId) {
+      params.append('guest_id', guestId);
+    }
+
+    if (params.toString()) {
+      wsUrl += `?${params.toString()}`;
+    }
+
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
