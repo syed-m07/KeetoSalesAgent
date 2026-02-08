@@ -271,7 +271,9 @@ async def websocket_endpoint(
                 user_context=user_context,
             )
 
-            await websocket.send_text(agent_response)
+            # Send JSON response with text and voice_text
+            import json
+            await websocket.send_text(json.dumps(agent_response))
 
     except WebSocketDisconnect:
         print(f"Client disconnected - Thread: {thread_id}")

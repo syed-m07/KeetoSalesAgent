@@ -119,16 +119,29 @@ function ChatApp({ user, onLogout }) {
 
     ws.onmessage = async (event) => {
       setIsLoading(false);
-      const agentResponse = event.data;
-      setMessages(prev => [...prev, { sender: 'agent', text: agentResponse }]);
+
+      // Parse JSON response from backend
+      let agentText = '';
+      let voiceText = '';
+      try {
+        const response = JSON.parse(event.data);
+        agentText = response.text || event.data;
+        voiceText = response.voice_text || '';
+      } catch (e) {
+        // Fallback for plain text (backward compat)
+        agentText = event.data;
+      }
+
+      setMessages(prev => [...prev, { sender: 'agent', text: agentText }]);
 
       // Activate browser stream if agent navigated
-      if (agentResponse.toLowerCase().includes('navigated') || agentResponse.toLowerCase().includes('go to') || agentResponse.toLowerCase().includes('youtube')) {
+      if (agentText.toLowerCase().includes('navigated') || agentText.toLowerCase().includes('go to') || agentText.toLowerCase().includes('youtube')) {
         setIsBrowserActive(true);
       }
 
-      // Auto-play TTS for agent responses
-      await speakText(agentResponse);
+      // Auto-play TTS - use short voice_text if available, else full text
+      const textToSpeak = voiceText || agentText;
+      await speakText(textToSpeak);
     };
 
     ws.onclose = () => {

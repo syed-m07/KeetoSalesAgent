@@ -201,14 +201,19 @@ def invoke_graph(
         if messages:
             last_message = messages[-1]
             if hasattr(last_message, 'content'):
-                return last_message.content
-            return str(last_message)
+                text = last_message.content
+                # Extract voice_text from additional_kwargs if present
+                voice_text = ""
+                if hasattr(last_message, 'additional_kwargs'):
+                    voice_text = last_message.additional_kwargs.get("voice_text", "")
+                return {"text": text, "voice_text": voice_text}
+            return {"text": str(last_message), "voice_text": ""}
         
-        return "I processed your request but have no response."
+        return {"text": "I processed your request but have no response.", "voice_text": ""}
     
     except Exception as e:
         print(f"Graph invocation error: {e}")
         import traceback
         traceback.print_exc()
-        return f"Error: {e}"
+        return {"text": f"Error: {e}", "voice_text": ""}
 

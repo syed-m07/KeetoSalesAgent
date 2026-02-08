@@ -41,6 +41,25 @@ class ScreenshotRequest(BaseModel):
     selector: Optional[str] = None  # If provided, screenshots only that element
 
 
+class PressKeyRequest(BaseModel):
+    key: str  # e.g., "Enter", "Escape", "ArrowDown"
+
+
+class ScrollRequest(BaseModel):
+    direction: str = "down"  # "up" or "down"
+    amount: int = 300  # pixels
+
+
+class EvaluateJSRequest(BaseModel):
+    expression: str  # JavaScript expression to evaluate
+
+
+class WaitForSelectorRequest(BaseModel):
+    selector: str
+    timeout: int = 10000  # milliseconds
+    state: str = "visible"  # "visible", "attached", "hidden"
+
+
 class BrowserActionResponse(BaseModel):
     success: bool
     message: str
@@ -151,6 +170,19 @@ class BrowserManager:
                 "title": await self.page.title(),
             }
     
+    async def press_key(self, key: str) -> dict:
+        """Press a keyboard key."""
+        async with self._lock:
+            await self.page.keyboard.press(key)
+            return {"pressed": key}
+    
+    async def scroll(self, direction: str = "down", amount: int = 300) -> dict:
+        """Scroll the page."""
+        async with self._lock:
+            delta = amount if direction == "down" else -amount
+            await self.page.mouse.wheel(0, delta)
+            return {"scrolled": direction, "amount": amount}
+    
     async def get_frame(self) -> bytes:
         """Capture current page as JPEG bytes for streaming."""
         # Don't lock here - we want non-blocking frame capture for streaming
@@ -159,6 +191,56 @@ class BrowserManager:
         except Exception:
             # Return empty bytes on error (page may be navigating)
             return b""
+    
+    async def get_video_state(self) -> dict:
+        """Get the state of the video element on the page."""
+        async with self._lock:
+            try:
+                state = await self.page.evaluate("""
+                    () => {
+                        const video = document.querySelector('video');
+                        if (!video) return { exists: false };
+                        return {
+                            exists: true,
+                            paused: video.paused,
+                            currentTime: video.currentTime,
+                            duration: video.duration || 0,
+                            readyState: video.readyState,
+                            src: video.src || video.currentSrc || ''
+                        };
+                    }
+                """)
+                state["url"] = self.page.url
+                return state
+            except Exception as e:
+                return {"exists": False, "error": str(e), "url": self.page.url}
+    
+    async def evaluate_js(self, expression: str) -> dict:
+        """Evaluate a JavaScript expression and return the result."""
+        async with self._lock:
+            try:
+                result = await self.page.evaluate(expression)
+                return {"success": True, "result": result}
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+    
+    async def wait_for_selector(self, selector: str, timeout: int = 10000, state: str = "visible") -> dict:
+        """Wait for a selector to appear/become visible."""
+        async with self._lock:
+            try:
+                await self.page.wait_for_selector(selector, timeout=timeout, state=state)
+                return {"found": True, "selector": selector}
+            except Exception as e:
+                return {"found": False, "selector": selector, "error": str(e)}
+    
+    async def wait_for_url_change(self, pattern: str, timeout: int = 10000) -> dict:
+        """Wait for URL to match a pattern."""
+        async with self._lock:
+            try:
+                await self.page.wait_for_url(f"**{pattern}**", timeout=timeout)
+                return {"matched": True, "url": self.page.url}
+            except Exception as e:
+                return {"matched": False, "error": str(e), "url": self.page.url}
 
 
 # Global browser manager instance
@@ -278,7 +360,58 @@ async def screenshot(request: ScreenshotRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/press", response_model=BrowserActionResponse)
+async def press_key(request: PressKeyRequest):
+    """Press a keyboard key."""
+    try:
+        data = await browser_manager.press_key(request.key)
+        return BrowserActionResponse(success=True, message=f"Pressed {request.key}", data=data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/scroll", response_model=BrowserActionResponse)
+async def scroll(request: ScrollRequest):
+    """Scroll the page."""
+    try:
+        data = await browser_manager.scroll(request.direction, request.amount)
+        return BrowserActionResponse(success=True, message=f"Scrolled {request.direction}", data=data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # --- WebSocket for Real-time Browser Control ---
+
+# Active Sensing Endpoints
+@app.get("/get-video-state", response_model=BrowserActionResponse)
+async def get_video_state():
+    """Get the current video element state (paused, time, duration)."""
+    try:
+        data = await browser_manager.get_video_state()
+        return BrowserActionResponse(success=True, message="Video state retrieved", data=data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/evaluate-js", response_model=BrowserActionResponse)
+async def evaluate_js(request: EvaluateJSRequest):
+    """Evaluate a JavaScript expression on the page."""
+    try:
+        data = await browser_manager.evaluate_js(request.expression)
+        return BrowserActionResponse(success=data.get("success", False), message="JS evaluated", data=data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/wait-for-selector", response_model=BrowserActionResponse)
+async def wait_for_selector(request: WaitForSelectorRequest):
+    """Wait for a selector to appear on the page."""
+    try:
+        data = await browser_manager.wait_for_selector(request.selector, request.timeout, request.state)
+        return BrowserActionResponse(success=data.get("found", False), message="Selector wait complete", data=data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.websocket("/ws/browser")
 async def websocket_browser(websocket: WebSocket):

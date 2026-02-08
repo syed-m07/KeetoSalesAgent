@@ -5,7 +5,7 @@ __pycache__/
 Proposed Architecture and Components.pdf
 context_for_gemini.txt
 .agent/
-TESTING_EVERY_SERVICE.txt
+CONVERSATION_SERVICE_LOGS.txt
 
 # C extensions
 *.so
