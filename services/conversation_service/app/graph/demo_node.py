@@ -163,9 +163,16 @@ def _execute_demo_action(action: str, state: AgentState, retry_attempt: int = 0)
     """Execute a browser action for the demo with robust selectors."""
     
     if action == "navigate_youtube":
-        result = _call_browser_service("navigate", {"url": "https://www.youtube.com", "wait_until": "networkidle"}, timeout=45.0)
+        # Check if already on YouTube (pre-warmed during intro)
+        video_state = _get_video_state()
+        if "youtube.com" in video_state.get("url", ""):
+            print("🚀 YouTube already loaded (pre-warmed)")
+            return "Successfully opened YouTube"
+        
+        # Fallback: navigate now with FAST wait strategy
+        result = _call_browser_service("navigate", {"url": "https://www.youtube.com", "wait_until": "domcontentloaded"}, timeout=15.0)
         if result.get("success"):
-            time.sleep(2)  # Wait for YouTube dynamic content
+            time.sleep(0.5)  # Minimal wait for JS hydration
             return "Successfully opened YouTube"
         return f"Navigation issue: {result.get('error', 'unknown')}"
     
@@ -202,43 +209,74 @@ def _execute_demo_action(action: str, state: AgentState, retry_attempt: int = 0)
         return f"Search issue: {result.get('error', 'unknown')}"
     
     elif action == "click_video":
-        # Wait for results, then click first video
-        time.sleep(2)  # Extra wait for YouTube to render results
+        # STEP 1: Dismiss any YouTube popups/overlays that block interaction
+        popup_selectors = [
+            # Cookie consent (EU)
+            "button[aria-label='Accept all']",
+            "button[aria-label='Accept the use of cookies and other data for the purposes described']",
+            "tp-yt-paper-button[aria-label='Accept all']",
+            # Sign-in popup
+            "button[aria-label='No thanks']",
+            "button.yt-spec-button-shape-next--call-to-action[aria-label='Dismiss']",
+            # "Not now" / "Skip" buttons
+            "button[aria-label='Not now']",
+            "yt-button-renderer#dismiss-button button",
+        ]
+        for popup_sel in popup_selectors:
+            _call_browser_service("click", {"selector": popup_sel, "timeout": 1000})
         
-        # Strategy 1: Standard video renderer
+        # Press Escape to dismiss any remaining overlays
+        _call_browser_service("press", {"key": "Escape"})
+        time.sleep(0.3)
+        
+        # STEP 2: Wait for search results to actually render
+        # Wait for at least one video-title element to exist
+        _call_browser_service("wait-for-selector", {"selector": "a#video-title", "timeout": 8000, "state": "visible"})
+        
+        # STEP 3: Try clicking with CSS selectors
         selectors = [
-            "ytd-video-renderer:first-of-type a#video-title",
-            "ytd-video-renderer a#video-title",
             "a#video-title",
+            "ytd-video-renderer a#video-title",
             "ytd-rich-item-renderer a#video-title-link",
         ]
         
         for selector in selectors:
-            result = _call_browser_service("click", {"selector": selector, "timeout": 8000})
+            result = _call_browser_service("click", {"selector": selector, "timeout": 3000})
             if result.get("success"):
-                # VERIFICATION: Wait for URL to change to watch page
-                time.sleep(2)
-                for _ in range(5):  # Poll for 5 seconds
+                # Verify URL changed
+                for _ in range(20):
                     video_state = _get_video_state()
                     if "watch?v=" in video_state.get("url", ""):
-                        # Video page loaded, now wait for video element
-                        if video_state.get("exists") and video_state.get("readyState", 0) > 0:
-                            return "Successfully selected and loaded video"
-                    time.sleep(1)
-                # URL changed but video not ready yet
+                        return "Successfully selected and loaded video"
+                    time.sleep(0.1)
                 if "watch?v=" in video_state.get("url", ""):
                     return "Video page opened (loading...)"
         
-        # If on retry, try scrolling down first
+        # STEP 4: FAILSAFE - Use keyboard navigation (Tab to first video, Enter to click)
+        # This works even when CSS selectors fail due to Shadow DOM or dynamic rendering
+        print("🎬 Trying keyboard navigation fallback...")
+        for _ in range(3):  # Tab a few times to reach video links
+            _call_browser_service("press", {"key": "Tab"})
+            time.sleep(0.1)
+        _call_browser_service("press", {"key": "Enter"})
+        time.sleep(1)
+        
+        # Check if we navigated to a video
+        video_state = _get_video_state()
+        if "watch?v=" in video_state.get("url", ""):
+            return "Successfully selected video via keyboard"
+        
+        # If on retry, scroll and try again
         if retry_attempt > 0:
-            _call_browser_service("scroll", {"direction": "down", "amount": 300})
+            _call_browser_service("scroll", {"direction": "down", "amount": 400})
+            time.sleep(0.5)
+            _call_browser_service("click", {"selector": "a#video-title", "timeout": 3000})
             time.sleep(1)
-            result = _call_browser_service("click", {"selector": "ytd-video-renderer a#video-title", "timeout": 5000})
-            if result.get("success"):
-                time.sleep(3)
+            video_state = _get_video_state()
+            if "watch?v=" in video_state.get("url", ""):
                 return "Successfully selected a video"
         
-        return f"Video selection issue: Could not find clickable video"
+        return "Video selection issue: Could not find clickable video"
     
     elif action == "pause_video":
         # VERIFIED pause: Use YouTube's "K" keyboard shortcut (more reliable than clicking)
@@ -357,6 +395,12 @@ def demo_node(state: AgentState) -> dict:
     # Initialize demo if not active
     if not demo.get("is_active"):
         print("🎬 Initializing demo workflow")
+        
+        # PRE-WARM: Navigate to YouTube NOW while user reads intro (SPEED OPTIMIZATION)
+        # This saves ~3-5s when user says "start"
+        _call_browser_service("navigate", {"url": "https://www.youtube.com", "wait_until": "domcontentloaded"}, timeout=15.0)
+        print("🚀 Pre-warmed: YouTube loaded in background")
+        
         step_info = DEMO_STEPS[0]
         response = _generate_demo_response(step_info, 0, "", user_context)
         voice_script = step_info.get("voice_script", "")
