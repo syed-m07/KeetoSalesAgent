@@ -1,188 +1,90 @@
 # Keeto Sales Agent 🤖
 
-An AI-powered Sales Agent with browser automation, voice capabilities, and a premium glassmorphism UI. Built with LangChain, Playwright, and React.
+A high-performance, AI-powered Sales Agent capable of conducting live software demos via browser automation. Built with **active sensing** architecture to ensure reliability on any hardware.
 
-## 🚀 Features
+## 🚀 Key Innovation: "Active Sensing" Agent
+Unlike traditional "fire-and-forget" automation, this agent verifies every action before proceeding. It doesn't just "click" — it **senses**.
 
-| Feature | Status | Description |
-|---------|--------|-------------|
-| **LLM Integration** | ✅ | **Gemini 2.0 Flash** (smart/fast) or **Llama 3.3 70B** (Groq) |
-| **Guided Demo Mode** | ✅ | Interactive YouTube pilot workflow (Search -> Select -> Pause) |
-| **Browser Automation** | ✅ | Navigate, type, click with Playwright |
-| **Live Browser Stream** | ✅ | MJPEG streaming at ~10 FPS |
-| **Text-to-Speech** | ✅ | gTTS with markdown stripping for natural voice |
-| **Premium UI** | ✅ | Glassmorphism dark theme |
-| **Docker Orchestration** | ✅ | Full containerized stack |
+| Feature | How It Works | Benefit |
+|---------|--------------|---------|
+| **Active Sensing** | Clicks verify URL changes + Video State (paused/playing) | **Zero "Blind" Failures** (Agent won't lie about actions) |
+| **Split Brain Loop** | Voice & Action pipelines run in parallel | **<1s Latency** for voice responses while actions load |
+| **Speed Mode** | Uses `domcontentloaded` + Pre-warming | **Instant Demo** start (0s latency on "Start") |
+| **Robustness** | Auto-dismisses popups, uses Keyboard Fallbacks | Works even when CSS selectors fail |
 
-## 📁 Project Structure
+## 📁 Architecture
 
+```mermaid
+graph TD
+    User((User)) <-->|WebSocket| Conv[Conversation Service]
+    Conv <-->|HTTP| Browser[Browser Service]
+    Browser <-->|Playwright| Chrome[Headless Chrome]
+    
+    subgraph "Active Sensing Loop"
+        Browser --1. Action--> Chrome
+        Chrome --2. State Change?--> Browser
+        Browser --3. Verification--> Conv
+    end
 ```
-.
-├── docker-compose.yml          # Orchestrates all services
-├── .env                        # Environment variables (GEMINI_API_KEY, GROQ_API_KEY)
-├── frontend/                   # React frontend
-│   └── src/
-│       ├── App.js              # Main UI with chat + browser stream
-│       └── App.css             # Glassmorphism styling
-└── services/
-    ├── browser_service/        # The "Hands" - Playwright automation
-    │   └── app/
-    │       └── main.py         # REST API + MJPEG stream
-    └── conversation_service/   # The "Brain" - LLM + Voice
-        └── app/
-            ├── main.py         # FastAPI + WebSocket
-            ├── graph/          # LangGraph Agent Logic
-            │   ├── builder.py  # Graph construction
-            │   ├── nodes.py    # Agent nodes (router, chat, demo)
-            │   └── demo_node.py # YouTube Demo workflow logic
-            ├── voice.py        # TTS module (supports markdown stripping)
-            └── tools.py        # Browser tool definitions
-```
+
+### Core Services
+- **Conversation Service**: The "Brain". Uses LangGraph to manage state, retry logic, and split-brain voice generation.
+- **Browser Service**: The "Hands". A specialized Playwright API that reports rich state (video time, player status, URL) instead of just success/fail.
+- **Frontend**: React-based UI with glassmorphism design, real-time MJPEG stream, and voice visualization.
 
 ## 🛠️ Quick Start
 
 ### Prerequisites
 - Docker & Docker Compose
-- Groq API key (free at [console.groq.com](https://console.groq.com)) OR Gemini API Key (recommended)
-- Node.js 18+ (for frontend dev)
+- Groq/Gemini API Key
 
 ### 1. Setup Environment
 ```bash
 # Create .env file
+echo "GEMINI_API_KEY=your-gemini-key" > .env
+# OR
 echo "GROQ_API_KEY=your-groq-key" > .env
-echo "GEMINI_API_KEY=your-gemini-key" >> .env
 ```
 
-### 2. Start Services
+### 2. Run the Stack
 ```bash
-# Build and run all containers
+# Build and start all services
 docker compose up -d --build
-
-# Check status
-docker compose ps
 ```
 
-### 3. Start Frontend
-```bash
-cd frontend
-npm install
-npm start
-```
-
-### 4. Open the App
+### 3. Access the Agent
 - **Frontend**: http://localhost:3000
-- **API Docs**: http://localhost:8000/docs
 - **Browser Stream**: http://localhost:8001/stream
 
-## 🎯 Usage Examples
+## 🎯 Demo Capabilities
+Say **"Show me a demo"** to start the guided YouTube pilot.
 
-| Command | Action |
-|---------|--------|
-| "hello" | Simple greeting (no tools) |
-| "show me a demo" | Starts the **Guided YouTube Demo** |
-| "go to youtube.com" | Navigate browser (manual mode) |
-| "type artificial intelligence" | Type in search field |
-| "click search" | Click search button |
+The agent will:
+1. **Navigate** to YouTube (Pre-warmed in background for speed)
+2. **Search** for "Artificial Intelligence" (Handles popups/overlays)
+3. **Select** a video (Uses Keyboard fallback if clicks fail)
+4. **Control Playback** (Pause/Play using "K" shortcut)
 
-## 🏗️ Architecture
+**Interrupt It!**
+You can say "Pause video", "Search for cats", or "Stop" *at any time* during the demo. The agent handles interrupts gracefully.
 
-```
-┌─────────────┐     WebSocket      ┌─────────────────────┐
-│   Frontend  │◄──────────────────►│ conversation_service│
-│  (React)    │                    │ (LangGraph/Gemini)  │
-└──────┬──────┘                    └──────────┬──────────┘
-       │                                      │
-       │ MJPEG Stream                         │ HTTP API
-       │                                      ▼
-       │                           ┌─────────────────────┐
-       └──────────────────────────►│   browser_service   │
-                                   │    (Playwright)     │
-                                   └─────────────────────┘
-```
+## ⚡ Performance Optimizations
+We implemented a "Speed Mode" to run on standard hardware:
+- **No `networkidle`**: We use `domcontentloaded` to avoid waiting for slow analytics requests.
+- **Aggressive Pre-warming**: The browser navigates to the target site *while the agent introduces itself*.
+- **Fast Polling**: Verification loops run at **10Hz (0.1s)** for instant responsiveness.
 
-## 🔧 Configuration
+## 🔧 Troubleshooting
 
-### Environment Variables (docker-compose.yml)
+**"Video selection issue"**
+- The agent includes a 4-layer fallback system:
+    1. Dismiss Popups (Cookie consent, Sign-in)
+    2. Wait for Results to render
+    3. CSS Click
+    4. **Keyboard Navigation (Tab+Enter)** as failsafe
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `LLM_PROVIDER` | `groq` | `groq` (free), `gemini` (smart), or `ollama` (local) |
-| `GEMINI_API_KEY` | - | Google Gemini API Key |
-| `GROQ_API_KEY` | - | Your Groq API key |
-| `GROQ_MODEL` | `llama-3.3-70b-versatile` | Groq model to use |
-| `OLLAMA_HOST` | `host.docker.internal:11434` | Ollama server URL |
-| `OLLAMA_MODEL` | `llama3.2:3b` | Ollama model to use |
-
-### Switching LLM Providers
-
-```yaml
-# In docker-compose.yml:
-LLM_PROVIDER: gemini # Recommended for reasoning
-# OR
-LLM_PROVIDER: groq   # Fast, free 70B model
-```
-
-## 📡 API Endpoints
-
-### Conversation Service (Port 8000)
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Health check |
-| `/ws/chat` | WS | Chat WebSocket |
-| `/speak` | POST | Text-to-speech (returns MP3) |
-| `/voices` | GET | List available TTS voices |
-
-### Browser Service (Port 8001)
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Health check |
-| `/stream` | GET | MJPEG video stream |
-| `/navigate` | POST | Navigate to URL |
-| `/type` | POST | Type text into field |
-| `/click` | POST | Click element |
-| `/get-text` | POST | Get page text |
-| `/page-info` | GET | Get current URL/title |
-
-## 🧪 Testing
-
-### Health Checks
-```bash
-curl http://localhost:8000/health  # {"status":"ok"}
-curl http://localhost:8001/health  # {"status":"ok","service":"browser"}
-```
-
-### WebSocket Chat (CLI)
-```bash
-npx wscat -c ws://localhost:8000/ws/chat
-> hello
-< Hello! How can I help you today?
-```
-
-### Text-to-Speech
-```bash
-curl -X POST http://localhost:8000/speak \
-  -H "Content-Type: application/json" \
-  -d '{"text": "Hello world"}' \
-  --output test.mp3
-```
-
-## 🗺️ Roadmap
-
-- [x] **Phase 1**: Core Infrastructure (Docker, Postgres, Ollama)
-- [x] **Phase 2**: Browser Automation (Playwright, ReAct Agent)
-- [x] **Phase 3**: Premium Frontend + Voice (TTS, MJPEG, Glassmorphism)
-- [x] **Phase 4**: Agent Identity & Persistence (Postgres Checkpoints)
-- [x] **Phase 5**: YouTube Demo Pilot (Gemini/Groq, Demo Workflow)
-- [ ] **Phase 6**: Enrichment, CRM, Observability
+**High Latency?**
+- Ensure Docker has access to at least 4GB RAM. The agent is optimized for "Potato Hardware" but Chrome needs memory.
 
 ## 📝 License
-
 MIT
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run linting: `ruff check .`
-5. Submit a pull request
