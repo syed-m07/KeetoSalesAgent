@@ -100,6 +100,17 @@ services:
       - "8003:8003"
     environment:
       DATABASE_URL: postgresql://agent_user:agent_password@postgres:5432/agent_db
+      # CRM Provider: 'hubspot' or 'salesforce'
+      CRM_PROVIDER: ${CRM_PROVIDER:-hubspot}
+      # HubSpot
+      HUBSPOT_ACCESS_TOKEN: ${HUBSPOT_ACCESS_TOKEN}
+      # Salesforce
+      SALESFORCE_USERNAME: ${SALESFORCE_USERNAME}
+      SALESFORCE_PASSWORD: ${SALESFORCE_PASSWORD}
+      SALESFORCE_SECURITY_TOKEN: ${SALESFORCE_SECURITY_TOKEN}
+      # Email (Gmail SMTP)
+      EMAIL_SENDER: ${EMAIL_SENDER}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD}
     volumes:
       - ./services/crm_service/app:/app/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8003 --reload

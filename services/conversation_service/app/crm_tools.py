@@ -32,23 +32,56 @@ def save_lead(input_str: str) -> str:
 
     Args:
         input_str: Lead information in format "name|email|company|summary"
+                   or "name, email, company, summary" (comma-separated)
                    or just "name" for minimal lead.
 
     Returns:
         Confirmation message with lead ID.
     """
+    import re
+
     input_str = input_str.strip().strip("'\"")
 
-    # Parse input - support multiple formats
-    parts = [p.strip() for p in input_str.split("|")]
+    # Strip common prefixes the LLM might include
+    prefixes_to_strip = [
+        "save a lead:", "save lead:", "add a lead:", "add lead:",
+        "create a lead:", "create lead:", "new lead:",
+    ]
+    lower = input_str.lower()
+    for prefix in prefixes_to_strip:
+        if lower.startswith(prefix):
+            input_str = input_str[len(prefix):].strip()
+            break
+
+    # Detect delimiter: pipe or comma
+    if "|" in input_str:
+        parts = [p.strip() for p in input_str.split("|")]
+    else:
+        parts = [p.strip() for p in input_str.split(",")]
+
+    # Smart field detection: find email by pattern, rest by position
+    email_pattern = re.compile(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}')
 
     lead_data = {"name": parts[0] if parts else "Unknown"}
 
     if len(parts) > 1:
+        # Look through remaining parts for email, company, summary
+        remaining = parts[1:]
+        for part in remaining:
+            part = part.strip()
+            if email_pattern.match(part) and "email" not in lead_data:
+                lead_data["email"] = part
+            elif "email" not in lead_data and "@" in part:
+                lead_data["email"] = part
+            elif "company" not in lead_data and not email_pattern.match(part):
+                lead_data["company"] = part
+            elif "summary" not in lead_data:
+                lead_data["summary"] = part
+
+    # If we have 4+ parts in original order: name, email, company, summary
+    if len(parts) >= 4 and "email" not in lead_data:
         lead_data["email"] = parts[1]
-    if len(parts) > 2:
         lead_data["company"] = parts[2]
-    if len(parts) > 3:
         lead_data["summary"] = parts[3]
 
     try:

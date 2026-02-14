@@ -1,5 +1,6 @@
 """
 Lead model for CRM.
+Enhanced with external CRM sync tracking fields.
 """
 import uuid
 from datetime import datetime
@@ -20,6 +21,14 @@ class LeadStatus(str, enum.Enum):
     LOST = "lost"
 
 
+class CRMProvider(str, enum.Enum):
+    """External CRM provider."""
+
+    NONE = "none"
+    HUBSPOT = "hubspot"
+    SALESFORCE = "salesforce"
+
+
 class Lead(Base):
     """Lead model for storing prospect information."""
 
@@ -36,10 +45,21 @@ class Lead(Base):
         default=LeadStatus.NEW,
         nullable=False,
     )
+
+    # --- External CRM Sync Fields ---
+    external_id = Column(String(255), nullable=True, index=True)
+    provider = Column(
+        String(50),
+        default=CRMProvider.NONE.value,
+        nullable=False,
+    )
+    synced_at = Column(DateTime, nullable=True)
+    sync_error = Column(Text, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
     )
 
     def __repr__(self):
-        return f"<Lead(id={self.id}, name='{self.name}', status='{self.status}')>"
+        return f"<Lead(id={self.id}, name='{self.name}', status='{self.status}', provider='{self.provider}')>"

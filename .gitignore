@@ -6,6 +6,8 @@ Proposed Architecture and Components.pdf
 context_for_gemini.txt
 .agent/
 CONVERSATION_SERVICE_LOGS.txt
+Project_Explanation.md
+CRM_Setup_Guide.md
 
 # C extensions
 *.so
