@@ -4,7 +4,7 @@ Uses Edge TTS (Microsoft Neural TTS) for natural-sounding voices.
 Falls back to gTTS if Edge TTS fails.
 """
 import re
-import asyncio
+
 from io import BytesIO
 from typing import Optional
 

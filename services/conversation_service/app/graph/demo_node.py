@@ -133,7 +133,7 @@ def _handle_interrupt_command(user_text: str, user_name: str) -> dict | None:
                         "voice": "Video paused."
                     }
                 return {
-                    "text": f"I tried to pause but it didn't work. The video might still be loading.",
+                    "text": "I tried to pause but it didn't work. The video might still be loading.",
                     "voice": "Couldn't pause right now."
                 }
             else:
@@ -350,7 +350,7 @@ Is there anything else you'd like to know about Keeto?"""
     
     # Retry message
     if is_retry:
-        return f"I'm having a bit of trouble with this step. Let me try again... Say **'yes'** to retry or **'skip'** to move on."
+        return "I'm having a bit of trouble with this step. Let me try again... Say **'yes'** to retry or **'skip'** to move on."
     
     # Use LLM for other steps
     context_str = f"Name: {user_name}"
@@ -376,7 +376,7 @@ Is there anything else you'd like to know about Keeto?"""
     try:
         result = chain.invoke({})
         return result.content
-    except Exception as e:
+    except Exception:
         return f"Done with step {step_number}. Say 'next' to continue."
 
 

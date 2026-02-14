@@ -4,7 +4,7 @@ Tests the API endpoints locally without requiring external CRM connections.
 Run: docker exec crm_service pytest /app/tests/ -v
 """
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from uuid import uuid4
 
@@ -14,7 +14,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///./test_crm.db")
 os.environ.setdefault("CRM_PROVIDER", "none")
 
 from app.main import app
-from app.database import Base, engine
+from app.database import Base
 
 
 # Override database for tests (use SQLite in-memory)

@@ -44,7 +44,7 @@ def _call_browser_api_sync(endpoint: str, method: str = "POST", data: dict = Non
 def _run_async(coro):
     """Helper to run async code from sync context."""
     try:
-        loop = asyncio.get_running_loop()
+        asyncio.get_running_loop()
         # If we're already in an async context, we can't use run_until_complete
         # Create a new task instead
         import concurrent.futures

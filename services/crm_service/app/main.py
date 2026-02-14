@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 import logging
 
 from .database import engine, get_db, Base
-from .models import Lead, LeadStatus, CRMProvider
+from .models import Lead, LeadStatus
 from .schemas import LeadCreate, LeadResponse, LeadUpdate, EmailRequest, SyncResponse
 from .email_service import send_email, send_lead_notification
 from .adapters.base import CRMClient
