@@ -19,6 +19,9 @@ graph TD
     User((User)) <-->|WebSocket| Conv[Conversation Service]
     Conv <-->|HTTP| Browser[Browser Service]
     Browser <-->|Playwright| Chrome[Headless Chrome]
+    Conv <-->|HTTP| CRM[CRM Service]
+    CRM <-->|SQL| DB[(PostgreSQL)]
+    CRM -.->|Async Sync| ExtCRM(HubSpot/Salesforce)
     
     subgraph "Active Sensing Loop"
         Browser --1. Action--> Chrome
@@ -30,6 +33,7 @@ graph TD
 ### Core Services
 - **Conversation Service**: The "Brain". Uses LangGraph to manage state, retry logic, and split-brain voice generation.
 - **Browser Service**: The "Hands". A specialized Playwright API that reports rich state (video time, player status, URL) instead of just success/fail.
+- **CRM Service**: The "Closer". Captures leads instantly to a local buffer and syncs them to HubSpot/Salesforce in the background. Features provider-agnostic adapters and automated email follow-ups.
 - **Frontend**: React-based UI with glassmorphism design, real-time MJPEG stream, and voice visualization.
 
 ## 🛠️ Quick Start
@@ -41,9 +45,17 @@ graph TD
 ### 1. Setup Environment
 ```bash
 # Create .env file
-echo "GEMINI_API_KEY=your-gemini-key" > .env
-# OR
-echo "GROQ_API_KEY=your-groq-key" > .env
+# Create .env file with CRM settings
+cat <<EOF > .env
+GEMINI_API_KEY=your-gemini-key
+GROQ_API_KEY=your-groq-key
+
+# CRM Configuration (Optional)
+CRM_PROVIDER=hubspot # or salesforce
+HUBSPOT_ACCESS_TOKEN=your-token
+EMAIL_SENDER=your-email@gmail.com
+EMAIL_PASSWORD=your-app-password
+EOF
 ```
 
 ### 2. Run the Stack
